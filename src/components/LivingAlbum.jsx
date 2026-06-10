@@ -8,6 +8,7 @@ export default function LivingAlbum({ userId }) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [scratched, setScratched] = useState({});
   const [loading, setLoading] = useState(true);
+  const [showPlayer, setShowPlayer] = useState(false);
 
   const [profile, setProfile] = useState(null);
   const [memories, setMemories] = useState([]);
@@ -52,12 +53,41 @@ export default function LivingAlbum({ userId }) {
   }
 
   const displayProfile = profile || { couple_names: 'Sizning Albomingiz', est_date: new Date().getFullYear().toString() };
+  const musicUrl = displayProfile.spotify_url || '';
+
+  const getEmbedUrl = (url) => {
+    if (!url) return null;
+    if (url.includes('spotify.com/track/')) {
+      const id = url.split('track/')[1].split('?')[0];
+      return `https://open.spotify.com/embed/track/${id}?utm_source=generator`;
+    }
+    if (url.includes('music.yandex.ru')) {
+      const albumMatch = url.match(/album\/(\d+)/);
+      const trackMatch = url.match(/track\/(\d+)/);
+      if (albumMatch && trackMatch) {
+        return `https://music.yandex.ru/iframe/#track/${trackMatch[1]}/${albumMatch[1]}`;
+      }
+    }
+    return null;
+  };
+
+  const embedUrl = getEmbedUrl(musicUrl);
+
+  const toggleMusic = () => {
+    if (embedUrl) {
+      setShowPlayer(!showPlayer);
+    } else if (musicUrl) {
+      window.open(musicUrl, '_blank');
+    } else {
+      alert("Musiqa ulanmagan! Sozlamalardan musiqa linkini qo'shing.");
+    }
+  };
 
   return (
     <div className="min-h-screen bg-[#3b1c24] font-sans text-[#fdfcfc] overflow-x-hidden selection:bg-[#c88c75] selection:text-[#3b1c24] relative">
       
-      {/* Background ambient glow */}
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-lg h-[500px] bg-[#c88c75]/10 blur-[100px] rounded-full pointer-events-none" />
+      {/* Background ambient glow - optimized for performance */}
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-lg h-[500px] pointer-events-none" style={{ background: 'radial-gradient(circle, rgba(200,140,117,0.15) 0%, transparent 60%)' }} />
 
       {/* Navbar / Top */}
       <nav className="fixed top-0 w-full p-6 flex justify-between items-center z-50 mix-blend-difference">
@@ -70,13 +100,32 @@ export default function LivingAlbum({ userId }) {
             <Settings size={18} />
           </Link>
           <button 
-            onClick={() => setIsPlaying(!isPlaying)}
+            onClick={toggleMusic}
             className="p-3 rounded-full bg-[#141414]/50 backdrop-blur-md border border-[#c88c75]/30 text-[#c88c75] transition-all hover:bg-[#c88c75]/20"
           >
-            {isPlaying ? <Pause size={18} /> : <Play size={18} />}
+            {showPlayer ? <Pause size={18} /> : <Play size={18} />}
           </button>
         </div>
       </nav>
+
+      {/* Embedded Player */}
+      {showPlayer && embedUrl && (
+        <motion.div 
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="fixed top-24 left-1/2 -translate-x-1/2 w-[90%] max-w-sm z-50 rounded-xl overflow-hidden shadow-2xl"
+        >
+          <iframe 
+            src={embedUrl} 
+            width="100%" 
+            height={embedUrl.includes('yandex') ? "150" : "152"} 
+            frameBorder="0" 
+            allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" 
+            loading="lazy"
+            style={{ borderRadius: '12px' }}
+          ></iframe>
+        </motion.div>
+      )}
 
       <main className="pt-32 pb-24 px-6 max-w-md mx-auto relative z-10">
         
