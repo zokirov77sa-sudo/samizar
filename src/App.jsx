@@ -6,6 +6,8 @@ import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import CustomerPage from './pages/CustomerPage';
 
+import Migration from './pages/Migration';
+
 function ProtectedRoute({ children }) {
   const [session, setSession] = useState(undefined);
 
@@ -42,6 +44,7 @@ function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
         <Route path="/q/:id" element={<CustomerPage />} />
+        <Route path="/migration" element={<Migration />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>
