@@ -15,7 +15,6 @@ export default function Dashboard() {
   const [profile, setProfile] = useState({ couple_names: '', est_date: '', spotify_url: '' });
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
-  const [uploading, setUploading] = useState(false);
 
   useEffect(() => {
     fetchData();
