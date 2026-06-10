@@ -1,180 +1,513 @@
 import React, { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
-import { Heart, Music, Lock, Unlock, Play, Pause, Loader2 } from 'lucide-react';
 import { useParams } from 'react-router-dom';
 import { supabase } from '../supabase';
+import { Heart, Gem, ExternalLink, Sparkles, ChevronLeft, ChevronRight, ZoomIn, X } from 'lucide-react';
 
 export default function CustomerPage() {
-  const { id } = useParams(); // id corresponds to user_id
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [scratched, setScratched] = useState({});
+  const { id } = useParams();
+  const [item, setItem] = useState(null);
+  const [media, setMedia] = useState([]);
   const [loading, setLoading] = useState(true);
-
-  const [profile, setProfile] = useState(null);
-  const [memories, setMemories] = useState([]);
-  const [coupons, setCoupons] = useState([]);
+  const [error, setError] = useState(null);
+  const [activeImg, setActiveImg] = useState(0);
+  const [lightbox, setLightbox] = useState(false);
 
   useEffect(() => {
-    async function fetchData() {
-      if (!id) return;
-      setLoading(true);
-
-      const [profRes, memRes, coupRes] = await Promise.all([
-        supabase.from('profiles').select('*').eq('id', id).single(),
-        supabase.from('memories').select('*').eq('user_id', id).order('created_at', { ascending: false }),
-        supabase.from('coupons').select('*').eq('user_id', id).order('created_at', { ascending: true })
-      ]);
-
-      if (profRes.data) setProfile(profRes.data);
-      if (memRes.data) {
-        // assign random rotation and yOffset to memories for the cascade effect
-        const positionedMemories = memRes.data.map(m => ({
-          ...m,
-          rotation: (Math.random() * 10) - 5,
-          yOffset: (Math.random() * 40) - 20
-        }));
-        setMemories(positionedMemories);
-      }
-      if (coupRes.data) setCoupons(coupRes.data);
-
-      setLoading(false);
-    }
     fetchData();
   }, [id]);
 
-  const handleScratch = async (couponId) => {
-    setScratched(prev => ({ ...prev, [couponId]: true }));
-    // Update it in database to 'claimed'
-    await supabase.from('coupons').update({ is_claimed: true }).eq('id', couponId);
+  const fetchData = async () => {
+    try {
+      const { data, error: fetchErr } = await supabase
+        .from('qr_links')
+        .select('*')
+        .eq('id', id)
+        .single();
+
+      if (fetchErr || !data) {
+        setError('Bu QR kod bazada topilmadi.');
+        setLoading(false);
+        return;
+      }
+
+      setItem(data);
+
+      let mediaItems = [];
+      try {
+        const { data: mData } = await supabase
+          .from('media')
+          .select('*')
+          .eq('qr_link_id', id);
+        mediaItems = mData || [];
+        setMedia(mediaItems);
+      } catch {
+        setMedia([]);
+      }
+
+      if (mediaItems.length === 0 && data.url) {
+        setTimeout(() => {
+          const target = data.url.startsWith('http') ? data.url : `https://${data.url}`;
+          window.location.href = target;
+        }, 2000);
+      }
+    } catch (err) {
+      setError('Ulanishda xatolik: ' + err.message);
+    }
+    setLoading(false);
   };
 
+  const prevImg = () => setActiveImg(i => (i === 0 ? media.length - 1 : i - 1));
+  const nextImg = () => setActiveImg(i => (i === media.length - 1 ? 0 : i + 1));
+
   if (loading) {
-    return <div className="min-h-screen bg-samizar-burgundy flex items-center justify-center"><Loader2 className="text-samizar-rosegold animate-spin" size={40}/></div>;
+    return (
+      <div style={styles.loadingWrap}>
+        <div style={styles.loadingGem}>💎</div>
+        <div style={styles.loadingBar}>
+          <div style={styles.loadingFill} className="loading-fill" />
+        </div>
+        <p style={styles.loadingText}>Yuklanmoqda...</p>
+        <style>{`
+          @keyframes loadFill { from { width: 0%; } to { width: 100%; } }
+          .loading-fill { animation: loadFill 1.5s ease-out forwards; }
+          @keyframes gemPulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.15); } }
+        `}</style>
+      </div>
+    );
   }
 
-  if (!profile) {
-    return <div className="min-h-screen bg-samizar-burgundy flex items-center justify-center text-white font-serif text-2xl">Loyiha topilmadi :(</div>;
+  if (error) {
+    return (
+      <div style={styles.errorWrap}>
+        <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>❌</div>
+        <h2 style={{ color: '#ff4444', marginBottom: '0.5rem' }}>Topilmadi</h2>
+        <p style={{ color: '#888', maxWidth: '300px', textAlign: 'center', lineHeight: 1.6 }}>{error}</p>
+      </div>
+    );
   }
+
+  const isSold = item.status === 'sold';
+  const hasMedia = media.length > 0;
+  const displayLink = item.customerLink || item.url;
 
   return (
-    <div className="min-h-screen bg-samizar-burgundy font-sans text-samizar-light overflow-x-hidden selection:bg-samizar-rosegold selection:text-samizar-burgundy relative">
-      
-      {/* Background ambient glow */}
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-lg h-[500px] bg-samizar-rosegold/10 blur-[100px] rounded-full pointer-events-none" />
+    <div style={styles.page}>
+      {/* Background Effects */}
+      <div style={styles.bgGlow1} />
+      <div style={styles.bgGlow2} />
 
-      {/* Navbar / Top */}
-      <nav className="fixed top-0 w-full p-6 flex justify-between items-center z-50 mix-blend-difference">
-        <div className="flex flex-col items-center mx-auto">
-          <Heart className="w-8 h-8 text-samizar-rosegold mb-1" strokeWidth={1.5} />
-          <span className="font-serif tracking-[0.3em] text-sm text-samizar-rosegold uppercase">Samizar</span>
-        </div>
-        <button 
-          onClick={() => setIsPlaying(!isPlaying)}
-          className="absolute right-6 p-3 rounded-full bg-samizar-dark/50 backdrop-blur-md border border-samizar-rosegold/30 text-samizar-rosegold transition-all hover:bg-samizar-rosegold/20"
-        >
-          {isPlaying ? <Pause size={18} /> : <Play size={18} />}
-        </button>
-      </nav>
-
-      <main className="pt-32 pb-24 px-6 max-w-md mx-auto relative z-10">
-        
-        {/* Header Section */}
-        <motion.div 
-          initial={{ opacity: 0, y: 30 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 1, ease: "easeOut" }}
-          className="text-center mb-16"
-        >
-          <p className="text-samizar-rosegold/70 text-xs tracking-widest uppercase mb-4">{profile.est_date}</p>
-          <h1 className="font-serif text-5xl text-samizar-light mb-4 leading-tight">
-            Our <br /> Memories
-          </h1>
-          <p className="text-samizar-rosegold font-serif italic text-xl">{profile.couple_names}</p>
-          <div className="h-16 w-px bg-gradient-to-b from-samizar-rosegold/50 to-transparent mx-auto mt-8" />
-        </motion.div>
-
-        {/* Memory Grid (Cascade Style) */}
-        <div className="flex flex-col items-center gap-12 mb-24">
-          {memories.map((mem, i) => (
-            <motion.div
-              key={mem.id}
-              initial={{ opacity: 0, y: 50, rotate: 0 }}
-              whileInView={{ opacity: 1, y: mem.yOffset, rotate: mem.rotation }}
-              viewport={{ once: true, margin: "-100px" }}
-              transition={{ duration: 0.8, delay: i * 0.1 }}
-              whileHover={{ scale: 1.05, rotate: 0, zIndex: 10 }}
-              className="relative w-72 bg-[#fdfcfc] p-3 pb-12 shadow-2xl rounded-sm group cursor-pointer transition-all"
-              style={{ boxShadow: '0 20px 40px -10px rgba(0,0,0,0.5)' }}
-            >
-              <div className="w-full aspect-square overflow-hidden bg-gray-200">
-                <img 
-                  src={mem.image_url} 
-                  alt={mem.caption} 
-                  className="w-full h-full object-cover grayscale-[20%] group-hover:grayscale-0 transition-all duration-500"
-                />
-              </div>
-              <p className="absolute bottom-4 left-0 w-full text-center text-samizar-burgundy font-serif italic text-sm">
-                {mem.caption}
-              </p>
-            </motion.div>
-          ))}
-          {memories.length === 0 && <p className="text-samizar-rosegold/50">Xotiralar hali yuklanmagan.</p>}
-        </div>
-
-        {/* Love Coupons Section */}
-        <motion.div 
-          initial={{ opacity: 0 }}
-          whileInView={{ opacity: 1 }}
-          viewport={{ once: true }}
-          className="mt-12"
-        >
-          <h2 className="font-serif text-3xl text-samizar-light mb-8 text-center">Your Love <br/> Coupons</h2>
-          
-          <div className="flex flex-col gap-4">
-            {coupons.map((coupon, idx) => (
-              <div 
-                key={coupon.id}
-                onClick={() => !coupon.is_claimed && !scratched[coupon.id] && handleScratch(coupon.id)}
-                className="relative h-24 rounded-lg overflow-hidden cursor-pointer group"
-              >
-                {/* Underneath (Revealed state) */}
-                <div className="absolute inset-0 bg-samizar-dark border border-samizar-rosegold/30 rounded-lg flex items-center justify-between px-6">
-                  <div>
-                    <p className="text-samizar-rosegold/60 text-xs tracking-wider mb-1">COUPON #{String(idx + 1).padStart(3, '0')}</p>
-                    <p className="text-samizar-light font-medium">{coupon.title}</p>
-                  </div>
-                  <div className="w-10 h-10 rounded-full bg-samizar-rosegold/10 flex items-center justify-center text-samizar-rosegold">
-                    <Heart size={16} className={scratched[coupon.id] || coupon.is_claimed ? "fill-current" : ""} />
-                  </div>
-                </div>
-
-                {/* Cover (Scratch state) */}
-                <motion.div 
-                  initial={false}
-                  animate={{ 
-                    opacity: scratched[coupon.id] || coupon.is_claimed ? 0 : 1,
-                    scale: scratched[coupon.id] || coupon.is_claimed ? 1.1 : 1
-                  }}
-                  className="absolute inset-0 bg-gradient-to-r from-[#c88c75] via-[#e2b19e] to-[#c88c75] flex items-center justify-center pointer-events-none origin-center"
-                  style={{ backgroundSize: '200% auto', animation: 'shimmer 3s linear infinite' }}
-                >
-                  <div className="flex items-center gap-2 text-samizar-burgundy/80 font-medium tracking-wide">
-                    {coupon.is_claimed ? <Unlock size={16} /> : <Lock size={16} />}
-                    <span>{coupon.is_claimed ? "ALREADY CLAIMED" : "SCRATCH TO REVEAL"}</span>
-                  </div>
-                </motion.div>
-              </div>
-            ))}
-            {coupons.length === 0 && <p className="text-center text-samizar-rosegold/50">Hali kuponlar yo'q.</p>}
+      <main style={styles.main}>
+        {/* Header */}
+        <header style={styles.header}>
+          <div style={styles.logo}>
+            <div style={styles.logoIcon}><Gem size={20} color="#000" /></div>
+            <span style={styles.logoText}>BMC LUXURY</span>
           </div>
-          <style>{`
-            @keyframes shimmer {
-              to { background-position: 200% center; }
-            }
-          `}</style>
-        </motion.div>
+          <div style={styles.productCode}>{item.productCode}</div>
+        </header>
 
+        {/* Media Gallery */}
+        {hasMedia ? (
+          <div style={styles.galleryWrap}>
+            <div
+              style={styles.galleryMain}
+              onClick={() => setLightbox(true)}
+            >
+              <img
+                src={media[activeImg]?.url || media[activeImg]?.src}
+                alt={`Rasm ${activeImg + 1}`}
+                style={styles.galleryImg}
+                onError={e => { e.target.src = 'https://via.placeholder.com/500x400/111/333?text=BMC+Luxury'; }}
+              />
+              <div style={styles.zoomHint}><ZoomIn size={18} /> Kattalashtirish</div>
+              {media.length > 1 && (
+                <>
+                  <button style={{ ...styles.galleryBtn, left: '0.75rem' }} onClick={e => { e.stopPropagation(); prevImg(); }}>
+                    <ChevronLeft size={20} />
+                  </button>
+                  <button style={{ ...styles.galleryBtn, right: '0.75rem' }} onClick={e => { e.stopPropagation(); nextImg(); }}>
+                    <ChevronRight size={20} />
+                  </button>
+                </>
+              )}
+            </div>
+
+            {media.length > 1 && (
+              <div style={styles.thumbRow}>
+                {media.map((m, i) => (
+                  <div
+                    key={m.id}
+                    onClick={() => setActiveImg(i)}
+                    style={{
+                      ...styles.thumb,
+                      border: i === activeImg ? '2px solid #d4af37' : '2px solid transparent',
+                    }}
+                  >
+                    <img
+                      src={m.url || m.src}
+                      alt=""
+                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                      onError={e => { e.target.src = 'https://via.placeholder.com/80x80/111/333?text=BMC'; }}
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        ) : (
+          <div style={styles.noMediaWrap}>
+            <div style={styles.noMediaIcon}><Gem size={40} color="#d4af37" /></div>
+          </div>
+        )}
+
+        {/* Product Info Card */}
+        <div style={styles.infoCard}>
+          <div style={styles.statusBadge(isSold)}>
+            {isSold ? '● Sotilgan' : '● Mavjud'}
+          </div>
+
+          <h1 style={styles.title}>{item.title || 'BMC Luxury Buyum'}</h1>
+
+          <div style={styles.metaRow}>
+            <div style={styles.metaItem}>
+              <div style={styles.metaLabel}>Material</div>
+              <div style={styles.metaValue}>
+                <Gem size={14} color="#d4af37" style={{ marginRight: '0.3rem' }} />
+                {item.material || '—'}
+              </div>
+            </div>
+            {item.price && (
+              <div style={styles.metaItem}>
+                <div style={styles.metaLabel}>Narxi</div>
+                <div style={{ ...styles.metaValue, color: '#4ade80' }}>
+                  {Number(item.price).toLocaleString('uz-UZ')} so'm
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Divider */}
+          <div style={styles.divider} />
+
+          {/* SOLD — Memory Section */}
+          {isSold && (
+            <div style={styles.memorySection}>
+              <div style={styles.memoryHeader}>
+                <Sparkles size={18} color="#d4af37" />
+                <span style={styles.memoryTitle}>Maxsus Xotira</span>
+              </div>
+
+              {item.customerMessage && (
+                <blockquote style={styles.messageBlock}>
+                  "{item.customerMessage}"
+                </blockquote>
+              )}
+
+              {displayLink && (
+                <a
+                  href={displayLink}
+                  target="_blank"
+                  rel="noreferrer"
+                  style={styles.memoryBtn}
+                  onMouseOver={e => e.currentTarget.style.transform = 'scale(1.03)'}
+                  onMouseOut={e => e.currentTarget.style.transform = 'scale(1)'}
+                >
+                  <ExternalLink size={18} />
+                  XOTIRANI KO'RISH
+                </a>
+              )}
+
+              {item.soldAt && (
+                <div style={styles.soldDate}>
+                  🗓️ {new Date(item.soldAt).toLocaleDateString('uz-UZ', {
+                    year: 'numeric', month: 'long', day: 'numeric'
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* AVAILABLE — Info message */}
+          {!isSold && (
+            <div style={styles.availableInfo}>
+              <Heart size={20} color="#d4af37" />
+              <p style={styles.availableText}>
+                Bu buyum hozirda sotuvda. Bizning do'konimizga tashrif buyuring yoki bog'laning.
+              </p>
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <footer style={styles.footer}>
+          <p>© 2026 BMC LUXURY · Premium Jewelry</p>
+        </footer>
       </main>
+
+      {/* Lightbox */}
+      {lightbox && hasMedia && (
+        <div style={styles.lightboxBg} onClick={() => setLightbox(false)}>
+          <button style={styles.lightboxClose} onClick={() => setLightbox(false)}>
+            <X size={24} />
+          </button>
+          <img
+            src={media[activeImg]?.url || media[activeImg]?.src}
+            alt=""
+            style={styles.lightboxImg}
+            onClick={e => e.stopPropagation()}
+          />
+          {media.length > 1 && (
+            <>
+              <button style={{ ...styles.lightboxNav, left: '1rem' }} onClick={e => { e.stopPropagation(); prevImg(); }}>
+                <ChevronLeft size={28} />
+              </button>
+              <button style={{ ...styles.lightboxNav, right: '1rem' }} onClick={e => { e.stopPropagation(); nextImg(); }}>
+                <ChevronRight size={28} />
+              </button>
+            </>
+          )}
+        </div>
+      )}
+
+      <style>{`
+        @keyframes fadeUp { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes shimmer { 0%,100% { opacity:0.5; } 50% { opacity:1; } }
+      `}</style>
     </div>
   );
 }
+
+const styles = {
+  page: {
+    minHeight: '100vh',
+    background: '#0a0a0a',
+    color: '#fff',
+    fontFamily: "'Inter', sans-serif",
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  bgGlow1: {
+    position: 'fixed', top: '-20%', left: '-10%',
+    width: '500px', height: '500px',
+    background: 'radial-gradient(circle, rgba(212,175,55,0.06) 0%, transparent 65%)',
+    borderRadius: '50%', pointerEvents: 'none',
+  },
+  bgGlow2: {
+    position: 'fixed', bottom: '-10%', right: '-10%',
+    width: '400px', height: '400px',
+    background: 'radial-gradient(circle, rgba(212,175,55,0.04) 0%, transparent 65%)',
+    borderRadius: '50%', pointerEvents: 'none',
+  },
+  main: {
+    maxWidth: '480px', margin: '0 auto', padding: '1.5rem',
+    position: 'relative', zIndex: 1,
+    animation: 'fadeUp 0.7s ease-out',
+  },
+  header: {
+    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+    marginBottom: '1.5rem', paddingBottom: '1rem',
+    borderBottom: '1px solid rgba(255,255,255,0.05)',
+  },
+  logo: {
+    display: 'flex', alignItems: 'center', gap: '0.6rem',
+  },
+  logoIcon: {
+    background: 'linear-gradient(135deg, #d4af37, #f1c40f)',
+    padding: '0.5rem', borderRadius: '10px',
+    boxShadow: '0 4px 12px rgba(212,175,55,0.3)',
+    display: 'flex',
+  },
+  logoText: {
+    fontSize: '1rem', fontWeight: 800, letterSpacing: '1px',
+    background: 'linear-gradient(to right, #fff, #ccc)',
+    WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
+  },
+  productCode: {
+    fontSize: '0.7rem', color: '#d4af37', fontWeight: 700,
+    letterSpacing: '1.5px', opacity: 0.8,
+  },
+
+  // Gallery
+  galleryWrap: { marginBottom: '1.5rem' },
+  galleryMain: {
+    position: 'relative', borderRadius: '20px', overflow: 'hidden',
+    background: '#111', cursor: 'zoom-in',
+    border: '1px solid rgba(255,255,255,0.05)',
+    boxShadow: '0 20px 50px rgba(0,0,0,0.5)',
+    aspectRatio: '4/3',
+  },
+  galleryImg: {
+    width: '100%', height: '100%', objectFit: 'cover', display: 'block',
+    transition: 'transform 0.4s ease',
+  },
+  zoomHint: {
+    position: 'absolute', bottom: '0.75rem', right: '0.75rem',
+    background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(8px)',
+    color: '#d4af37', fontSize: '0.72rem', fontWeight: 600,
+    padding: '0.35rem 0.7rem', borderRadius: '99px',
+    display: 'flex', alignItems: 'center', gap: '0.3rem',
+    pointerEvents: 'none',
+  },
+  galleryBtn: {
+    position: 'absolute', top: '50%', transform: 'translateY(-50%)',
+    background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)',
+    border: '1px solid rgba(255,255,255,0.1)', color: '#fff',
+    borderRadius: '50%', width: '38px', height: '38px',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    cursor: 'pointer', zIndex: 2, transition: '0.2s',
+  },
+  thumbRow: {
+    display: 'flex', gap: '0.6rem', marginTop: '0.75rem',
+    overflowX: 'auto', paddingBottom: '0.25rem',
+  },
+  thumb: {
+    width: '60px', height: '60px', borderRadius: '10px',
+    overflow: 'hidden', cursor: 'pointer', flexShrink: 0,
+    transition: 'border-color 0.2s',
+  },
+  noMediaWrap: {
+    aspectRatio: '4/3', background: 'rgba(255,255,255,0.02)',
+    borderRadius: '20px', border: '1px dashed rgba(255,255,255,0.08)',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    marginBottom: '1.5rem',
+    animation: 'shimmer 2.5s infinite',
+  },
+  noMediaIcon: {
+    display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem',
+  },
+
+  // Info card
+  infoCard: {
+    background: 'rgba(255,255,255,0.03)',
+    border: '1px solid rgba(255,255,255,0.07)',
+    borderRadius: '24px', padding: '1.75rem',
+    boxShadow: '0 8px 30px rgba(0,0,0,0.3)',
+  },
+  statusBadge: (isSold) => ({
+    display: 'inline-flex', alignItems: 'center', gap: '0.3rem',
+    fontSize: '0.68rem', fontWeight: 700, letterSpacing: '0.5px',
+    padding: '0.3rem 0.8rem', borderRadius: '99px', marginBottom: '0.8rem',
+    background: isSold ? 'rgba(74,222,128,0.08)' : 'rgba(96,165,250,0.08)',
+    color: isSold ? '#4ade80' : '#60a5fa',
+    border: isSold ? '1px solid rgba(74,222,128,0.2)' : '1px solid rgba(96,165,250,0.2)',
+  }),
+  title: {
+    fontSize: '1.6rem', fontWeight: 800, lineHeight: 1.2,
+    marginBottom: '1.2rem', color: '#fff',
+    letterSpacing: '-0.3px',
+  },
+  metaRow: {
+    display: 'flex', gap: '1.5rem', flexWrap: 'wrap',
+    marginBottom: '1.2rem',
+  },
+  metaItem: { display: 'flex', flexDirection: 'column', gap: '0.25rem' },
+  metaLabel: { fontSize: '0.68rem', color: '#666', fontWeight: 600, letterSpacing: '0.5px', textTransform: 'uppercase' },
+  metaValue: {
+    fontSize: '0.95rem', fontWeight: 700, color: '#fff',
+    display: 'flex', alignItems: 'center',
+  },
+  divider: {
+    height: '1px', background: 'rgba(255,255,255,0.05)',
+    margin: '1.2rem 0',
+  },
+
+  // Memory section (sold)
+  memorySection: {
+    animation: 'fadeUp 0.6s ease-out',
+  },
+  memoryHeader: {
+    display: 'flex', alignItems: 'center', gap: '0.5rem',
+    marginBottom: '1rem',
+  },
+  memoryTitle: {
+    fontSize: '0.75rem', fontWeight: 800, color: '#d4af37',
+    letterSpacing: '1.5px', textTransform: 'uppercase',
+  },
+  messageBlock: {
+    fontStyle: 'italic', fontSize: '1rem', lineHeight: 1.7,
+    color: '#e0e0e0', marginBottom: '1.5rem',
+    padding: '1rem 1.25rem',
+    background: 'rgba(212,175,55,0.04)',
+    borderLeft: '3px solid rgba(212,175,55,0.4)',
+    borderRadius: '0 12px 12px 0',
+    whiteSpace: 'pre-wrap',
+  },
+  memoryBtn: {
+    display: 'inline-flex', alignItems: 'center', gap: '0.6rem',
+    padding: '1rem 2rem', background: 'linear-gradient(135deg, #d4af37, #f1c40f)',
+    color: '#000', borderRadius: '50px', fontWeight: 800, fontSize: '0.9rem',
+    textDecoration: 'none', boxShadow: '0 12px 30px rgba(212,175,55,0.25)',
+    transition: 'transform 0.2s ease, box-shadow 0.2s ease',
+    marginBottom: '1rem',
+  },
+  soldDate: {
+    fontSize: '0.75rem', color: '#555', marginTop: '1rem',
+  },
+
+  // Available info
+  availableInfo: {
+    display: 'flex', alignItems: 'flex-start', gap: '0.75rem',
+    padding: '1rem', background: 'rgba(212,175,55,0.05)',
+    borderRadius: '14px', border: '1px solid rgba(212,175,55,0.12)',
+  },
+  availableText: {
+    fontSize: '0.88rem', color: '#aaa', lineHeight: 1.6,
+    margin: 0,
+  },
+
+  footer: {
+    textAlign: 'center', marginTop: '3rem', paddingBottom: '2rem',
+    fontSize: '0.65rem', color: '#333', letterSpacing: '1px',
+  },
+
+  // Loading
+  loadingWrap: {
+    minHeight: '100vh', display: 'flex', flexDirection: 'column',
+    alignItems: 'center', justifyContent: 'center',
+    background: '#0a0a0a', gap: '1rem',
+  },
+  loadingGem: { fontSize: '3rem', animation: 'gemPulse 1.5s infinite' },
+  loadingBar: {
+    width: '120px', height: '2px',
+    background: 'rgba(255,255,255,0.05)', borderRadius: '99px', overflow: 'hidden',
+  },
+  loadingFill: {
+    height: '100%', background: 'linear-gradient(90deg, #d4af37, #f1c40f)',
+    borderRadius: '99px',
+  },
+  loadingText: { color: '#555', fontSize: '0.8rem' },
+
+  // Error
+  errorWrap: {
+    minHeight: '100vh', display: 'flex', flexDirection: 'column',
+    alignItems: 'center', justifyContent: 'center',
+    background: '#0a0a0a',
+  },
+
+  // Lightbox
+  lightboxBg: {
+    position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.95)',
+    backdropFilter: 'blur(20px)', display: 'flex',
+    alignItems: 'center', justifyContent: 'center', zIndex: 9999,
+  },
+  lightboxImg: {
+    maxWidth: '90vw', maxHeight: '85vh',
+    objectFit: 'contain', borderRadius: '12px',
+    boxShadow: '0 30px 80px rgba(0,0,0,0.8)',
+  },
+  lightboxClose: {
+    position: 'absolute', top: '1.5rem', right: '1.5rem',
+    background: 'rgba(255,255,255,0.1)', border: 'none',
+    color: '#fff', borderRadius: '50%',
+    width: '44px', height: '44px',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    cursor: 'pointer', zIndex: 1,
+  },
+  lightboxNav: {
+    position: 'absolute', top: '50%', transform: 'translateY(-50%)',
+    background: 'rgba(255,255,255,0.1)', border: 'none', color: '#fff',
+    borderRadius: '50%', width: '50px', height: '50px',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    cursor: 'pointer',
+  },
+};
