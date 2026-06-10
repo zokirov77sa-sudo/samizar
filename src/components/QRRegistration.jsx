@@ -30,6 +30,14 @@ export default function QRRegistration({ qrLink, onRegistered }) {
       const user = authData.user;
       if (!user) throw new Error("Foydalanuvchi yaratilmadi!");
 
+      if (user && user.identities && user.identities.length === 0) {
+        throw new Error("Ushbu pochta allaqachon ro'yxatdan o'tgan! Boshqa pochta ishlating.");
+      }
+
+      if (user && !authData.session) {
+        throw new Error("Supabase'da 'Confirm email' yoniq! Iltimos, Supabase -> Auth -> Providers -> Email bo'limidan 'Confirm email'ni O'CHIRING!");
+      }
+
       // 2. Create profile
       const { error: profileError } = await supabase.from('profiles').insert([
         {
