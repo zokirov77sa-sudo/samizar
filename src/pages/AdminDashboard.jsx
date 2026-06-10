@@ -38,7 +38,10 @@ function formatDate(isoStr) {
 function generateCode(existingLinks) {
   const nums = existingLinks
     .map(l => l.productCode).filter(Boolean)
-    .map(c => parseInt(c.replace('SEP-', ''), 10)).filter(n => !isNaN(n));
+    .map(c => {
+      const match = c.match(/\d+/);
+      return match ? parseInt(match[0], 10) : NaN;
+    }).filter(n => !isNaN(n));
   const next = nums.length ? Math.max(...nums) + 1 : 1;
   return `SEP-${String(next).padStart(3, '0')}`;
 }
@@ -241,7 +244,10 @@ export default function Dashboard() {
     try {
       const existingCodes = links.map(l => l.productCode).filter(Boolean);
       let nextNum = 0;
-      const nums = existingCodes.map(c => parseInt(c.replace('SEP-', ''), 10)).filter(n => !isNaN(n));
+      const nums = existingCodes.map(c => {
+        const match = c.match(/\d+/);
+        return match ? parseInt(match[0], 10) : NaN;
+      }).filter(n => !isNaN(n));
       if (nums.length > 0) nextNum = Math.max(...nums);
 
       for (let i = 0; i < bulkForm.count; i++) {
@@ -259,12 +265,18 @@ export default function Dashboard() {
           createdAt: new Date().toISOString()
         };
 
-        await supabase.from('qr_links').insert(item);
-        newItems.push(item);
+        const { error } = await supabase.from('qr_links').insert(item);
+        if (error) {
+          console.error("Insert failed for", code, error);
+        } else {
+          newItems.push(item);
+        }
       }
       await fetchLinks();
       setIsBulkModalOpen(false);
-      setBulkPrintData(newItems); // Store for printing
+      if (newItems.length > 0) {
+        setBulkPrintData(newItems); // Store for printing only successful inserts
+      }
     } catch (e) { alert("Xatolik yuz berdi"); }
     setIsGeneratingBulk(false);
   };
