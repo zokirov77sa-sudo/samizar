@@ -275,7 +275,10 @@ export default function Dashboard() {
       await fetchLinks();
       setIsBulkModalOpen(false);
       if (newItems.length > 0) {
+        alert(`${newItems.length} ta QR kod bazaga muvaffaqiyatli qo'shildi! Endi ularni chop etishingiz mumkin.`);
         setBulkPrintData(newItems); // Store for printing only successful inserts
+      } else {
+        alert("Bitta ham QR kod qo'shilmadi. Baza ulanishini yoki sozlamalarni tekshiring.");
       }
     } catch (e) { alert("Xatolik yuz berdi"); }
     setIsGeneratingBulk(false);
