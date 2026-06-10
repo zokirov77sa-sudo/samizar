@@ -51,9 +51,7 @@ export default function LivingAlbum({ userId }) {
     return <div className="min-h-screen bg-[#3b1c24] flex items-center justify-center"><Loader2 className="text-[#c88c75] animate-spin" size={40}/></div>;
   }
 
-  if (!profile) {
-    return <div className="min-h-screen bg-[#3b1c24] flex items-center justify-center text-white font-serif text-2xl">Loyiha topilmadi :(</div>;
-  }
+  const displayProfile = profile || { couple_names: 'Sizning Albomingiz', est_date: new Date().getFullYear().toString() };
 
   return (
     <div className="min-h-screen bg-[#3b1c24] font-sans text-[#fdfcfc] overflow-x-hidden selection:bg-[#c88c75] selection:text-[#3b1c24] relative">
@@ -89,11 +87,11 @@ export default function LivingAlbum({ userId }) {
           transition={{ duration: 1, ease: "easeOut" }}
           className="text-center mb-16"
         >
-          <p className="text-[#c88c75]/70 text-xs tracking-widest uppercase mb-4">{profile.est_date}</p>
+          <p className="text-[#c88c75]/70 text-xs tracking-widest uppercase mb-4">{displayProfile.est_date}</p>
           <h1 className="font-serif text-5xl text-[#fdfcfc] mb-4 leading-tight">
             Our <br /> Memories
           </h1>
-          <p className="text-[#c88c75] font-serif italic text-xl">{profile.couple_names}</p>
+          <p className="text-[#c88c75] font-serif italic text-xl">{displayProfile.couple_names}</p>
           <div className="h-16 w-px bg-gradient-to-b from-[#c88c75]/50 to-transparent mx-auto mt-8" />
         </motion.div>
 
