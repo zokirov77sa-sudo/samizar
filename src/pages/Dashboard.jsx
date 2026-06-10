@@ -19,10 +19,29 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [deferredPrompt, setDeferredPrompt] = useState(null);
 
   useEffect(() => {
     fetchData();
+
+    // Capture PWA install prompt
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+    });
   }, []);
+
+  const handleInstallApp = async () => {
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      if (outcome === 'accepted') {
+        setDeferredPrompt(null);
+      }
+    } else {
+      alert("Sizning qurilmangiz ilovani avtomatik o'rnatishni qo'llab-quvvatlamaydi yoki ilova allaqachon o'rnatilgan. (Brauzer menyusidan 'Add to Home Screen' ni bosing)");
+    }
+  };
 
   const fetchData = async () => {
     setLoading(true);
@@ -214,44 +233,74 @@ export default function Dashboard() {
           {/* OVERVIEW TAB */}
           {activeTab === 'overview' && (
             <div className="space-y-8">
-              <header>
-                <h1 className="text-3xl font-serif text-white mb-2">Salom, {profile.couple_names || 'Do\'stim'}!</h1>
-                <p className="text-gray-400">Albom holati va statistikasi.</p>
+              <header className="bg-gradient-to-r from-[#2a1a1f] to-[#1a1a1a] p-8 rounded-3xl border border-gray-800 shadow-xl relative overflow-hidden">
+                <div className="absolute right-0 top-0 w-64 h-64 bg-[#c88c75]/10 rounded-full blur-3xl pointer-events-none"></div>
+                <h1 className="text-4xl font-serif text-white mb-3">Salom, {profile.couple_names || 'Do\'stim'}! 👋</h1>
+                <p className="text-gray-400 max-w-xl text-lg">Bu sizning shaxsiy boshqaruv panelingiz. Bu yerdan albomga rasmlar qo'shishingiz, dizaynni o'zgartirishingiz va kuponlar yaratishingiz mumkin.</p>
+                
+                <div className="mt-6 flex flex-wrap gap-4">
+                  {deferredPrompt && (
+                    <button onClick={handleInstallApp} className="flex items-center gap-2 bg-[#c88c75] hover:bg-[#b57a64] text-white px-6 py-3 rounded-xl font-medium shadow-[0_0_20px_rgba(200,140,117,0.3)] transition-all">
+                      Telefon Ekranga O'rnatish (App)
+                    </button>
+                  )}
+                  <button onClick={() => window.open(`/${user.id}`, '_blank')} className="flex items-center gap-2 bg-white/10 hover:bg-white/20 text-white px-6 py-3 rounded-xl font-medium transition-all">
+                    Albomni Ko'rish
+                  </button>
+                </div>
               </header>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                <div className="bg-[#1a1a1a] border border-gray-800 p-6 rounded-2xl relative overflow-hidden">
-                  <div className="absolute -right-4 -top-4 w-24 h-24 bg-[#c88c75]/10 rounded-full blur-xl"></div>
-                  <h3 className="text-gray-400 text-sm font-medium mb-1">Xotiralar (Rasmlar)</h3>
-                  <p className="text-4xl font-light text-white">{memories.length}</p>
-                  {!profile.is_premium && <p className="text-xs text-red-400 mt-2">Limit: 3 ta. Cheksiz qilish uchun Premium oling.</p>}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div className="bg-[#1a1a1a] border border-gray-800 hover:border-gray-600 transition-colors p-6 rounded-3xl relative overflow-hidden">
+                  <h3 className="text-gray-400 font-medium mb-2 flex items-center gap-2"><ImageIcon size={18} /> Rasmlar soni</h3>
+                  <p className="text-5xl font-light text-white mb-2">{memories.length}</p>
+                  {!profile.is_premium ? (
+                    <p className="text-sm text-red-400">Tekin limit: 3 ta (Premium oling)</p>
+                  ) : (
+                    <p className="text-sm text-green-400">Cheksiz xotira</p>
+                  )}
                 </div>
-                <div className="bg-[#1a1a1a] border border-gray-800 p-6 rounded-2xl">
-                  <h3 className="text-gray-400 text-sm font-medium mb-1">Kuponlar</h3>
-                  <p className="text-4xl font-light text-white">{coupons.length}</p>
-                  <p className="text-xs text-gray-500 mt-2">{coupons.filter(c => c.is_claimed).length} tasi ishlatilgan</p>
+                <div className="bg-[#1a1a1a] border border-gray-800 hover:border-gray-600 transition-colors p-6 rounded-3xl relative overflow-hidden">
+                  <h3 className="text-gray-400 font-medium mb-2 flex items-center gap-2"><Gift size={18} /> Kuponlar</h3>
+                  <p className="text-5xl font-light text-white mb-2">{coupons.length}</p>
+                  <p className="text-sm text-gray-500">{coupons.filter(c => c.is_claimed).length} tasi ishlatilgan</p>
                 </div>
-                <div className={`border p-6 rounded-2xl ${profile.is_premium ? 'bg-gradient-to-br from-amber-500/20 to-yellow-600/10 border-amber-500/30' : 'bg-[#1a1a1a] border-gray-800'}`}>
-                  <h3 className="text-gray-400 text-sm font-medium mb-1">Tarif Rejasi</h3>
-                  <p className={`text-2xl font-serif ${profile.is_premium ? 'text-amber-400' : 'text-white'}`}>
+                <div className={`border p-6 rounded-3xl transition-colors ${profile.is_premium ? 'bg-gradient-to-br from-amber-500/20 to-yellow-600/10 border-amber-500/50' : 'bg-[#1a1a1a] border-gray-800 hover:border-gray-600'}`}>
+                  <h3 className="text-gray-400 font-medium mb-2 flex items-center gap-2"><CreditCard size={18} /> Tarif Rejasi</h3>
+                  <p className={`text-3xl font-serif mt-2 ${profile.is_premium ? 'text-amber-400' : 'text-white'}`}>
                     {profile.is_premium ? 'Premium ⭐' : 'Bepul Versiya'}
                   </p>
                   {!profile.is_premium && (
-                    <button onClick={() => setActiveTab('premium')} className="mt-4 w-full py-2 bg-white/10 hover:bg-white/20 rounded-lg text-sm transition-all">
+                    <button onClick={() => setActiveTab('premium')} className="mt-4 w-full py-2.5 bg-white/10 hover:bg-white/20 rounded-xl text-sm font-medium transition-all">
                       Kuchaytirish
                     </button>
                   )}
                 </div>
               </div>
 
-              <div className="bg-[#1a1a1a] border border-gray-800 rounded-2xl p-6">
-                <h2 className="text-xl font-serif mb-4">Tezkor amallar</h2>
-                <div className="flex flex-wrap gap-3">
-                  <button onClick={() => setActiveTab('memories')} className="flex items-center gap-2 bg-[#222] border border-gray-700 hover:border-[#c88c75] px-4 py-2 rounded-lg text-sm transition-all">
-                    <Plus size={16} /> Yangi rasm qo'shish
+              <div className="bg-[#1a1a1a] border border-gray-800 rounded-3xl p-8">
+                <h2 className="text-2xl font-serif mb-2">Qanday foydalaniladi?</h2>
+                <p className="text-gray-400 mb-6">Bu tizim orqali siz o'z yaqiningizga ajoyib xotira albomi yaratib bera olasiz:</p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <button onClick={() => setActiveTab('memories')} className="flex flex-col items-start gap-2 bg-[#222] border border-gray-700 hover:border-[#c88c75] p-5 rounded-2xl transition-all text-left">
+                    <div className="bg-[#c88c75]/20 p-2 rounded-lg text-[#c88c75]"><ImageIcon size={20} /></div>
+                    <span className="font-medium text-white text-lg">1. Rasmlar qo'shish</span>
+                    <span className="text-sm text-gray-400">Eng chiroyli xotiralaringizni yuklang.</span>
                   </button>
-                  <button onClick={handleAddCoupon} className="flex items-center gap-2 bg-[#222] border border-gray-700 hover:border-[#c88c75] px-4 py-2 rounded-lg text-sm transition-all">
-                    <Gift size={16} /> Kupon yasash
+                  <button onClick={() => setActiveTab('themes')} className="flex flex-col items-start gap-2 bg-[#222] border border-gray-700 hover:border-[#c88c75] p-5 rounded-2xl transition-all text-left">
+                    <div className="bg-[#c88c75]/20 p-2 rounded-lg text-[#c88c75]"><Palette size={20} /></div>
+                    <span className="font-medium text-white text-lg">2. Dizayn tanlash</span>
+                    <span className="text-sm text-gray-400">Albom qanday ko'rinishda bo'lishini tanlang.</span>
+                  </button>
+                  <button onClick={() => setActiveTab('settings')} className="flex flex-col items-start gap-2 bg-[#222] border border-gray-700 hover:border-[#c88c75] p-5 rounded-2xl transition-all text-left">
+                    <div className="bg-[#c88c75]/20 p-2 rounded-lg text-[#c88c75]"><Settings size={20} /></div>
+                    <span className="font-medium text-white text-lg">3. Sozlamalar</span>
+                    <span className="text-sm text-gray-400">Musiqa va ismlarni to'g'rilang.</span>
+                  </button>
+                  <button onClick={() => setActiveTab('coupons')} className="flex flex-col items-start gap-2 bg-[#222] border border-gray-700 hover:border-[#c88c75] p-5 rounded-2xl transition-all text-left">
+                    <div className="bg-[#c88c75]/20 p-2 rounded-lg text-[#c88c75]"><Gift size={20} /></div>
+                    <span className="font-medium text-white text-lg">4. Syurpriz Kuponlar</span>
+                    <span className="text-sm text-gray-400">Qiziqarli sovg'a kuponlarini yarating.</span>
                   </button>
                 </div>
               </div>
