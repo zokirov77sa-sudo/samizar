@@ -96,7 +96,7 @@ export default function Dashboard() {
     fetchData();
   };
 
-  if (loading) return <div className="min-h-screen flex items-center justify-center"><Loader2 className="animate-spin text-samizar-rosegold" size={40}/></div>;
+  if (loading) return <div className="min-h-screen flex items-center justify-center"><Loader2 className="animate-spin text-[#c88c75]" size={40}/></div>;
 
   if (isAdmin) {
     return <AdminDashboard />;
@@ -108,15 +108,15 @@ export default function Dashboard() {
   ];
 
   return (
-    <div className="min-h-screen bg-[#fdfcfc] font-sans text-samizar-burgundy">
+    <div className="min-h-screen bg-[#3b1c24] font-sans text-white">
       
       {/* Sidebar / Topbar */}
-      <nav className="w-full bg-samizar-burgundy text-samizar-light p-4 flex justify-between items-center shadow-md">
+      <nav className="w-full bg-[#2d141b] text-white p-4 flex justify-between items-center shadow-md">
         <div className="flex items-center gap-2">
-          <Heart className="w-6 h-6 text-samizar-rosegold" />
-          <span className="font-serif tracking-widest text-lg text-samizar-rosegold uppercase">Living Album</span>
+          <Heart className="w-6 h-6 text-[#c88c75]" />
+          <span className="font-serif tracking-widest text-lg text-[#c88c75] uppercase">Living Album</span>
         </div>
-        <button onClick={handleLogout} className="text-samizar-rosegold hover:text-white transition-colors">
+        <button onClick={handleLogout} className="text-[#c88c75] hover:text-white transition-colors">
           <LogOut size={20} />
         </button>
       </nav>
@@ -125,21 +125,21 @@ export default function Dashboard() {
         
         <div className="flex justify-between items-end mb-8">
           <div>
-            <h1 className="font-serif text-4xl mb-2 text-samizar-dark">Your Story</h1>
-            <p className="text-gray-500 text-sm">Manage your memories, coupons, and app settings here.</p>
+            <h1 className="font-serif text-4xl mb-2 text-white">Your Story</h1>
+            <p className="text-[#ae939a] text-sm">Manage your memories, coupons, and app settings here.</p>
           </div>
-          <button className="bg-samizar-rosegold text-white px-6 py-3 rounded-md font-medium shadow-lg hover:bg-[#b57a64] transition-all flex items-center gap-2">
+          <button className="bg-[#c88c75] text-white px-6 py-3 rounded-md font-medium shadow-lg hover:bg-[#b57a64] transition-all flex items-center gap-2">
             <Plus size={18} /> Add New
           </button>
         </div>
 
         {/* Tabs */}
-        <div className="flex gap-8 border-b border-gray-200 mb-8">
+        <div className="flex gap-8 border-b border-[#613c45] mb-8">
           {['memories', 'coupons', 'settings'].map(tab => (
             <button 
               key={tab}
               onClick={() => setActiveTab(tab)}
-              className={`pb-3 font-medium uppercase tracking-wider text-sm transition-all ${activeTab === tab ? 'text-samizar-burgundy border-b-2 border-samizar-burgundy' : 'text-gray-400 hover:text-gray-600'}`}
+              className={`pb-3 font-medium uppercase tracking-wider text-sm transition-all ${activeTab === tab ? 'text-white border-b-2 border-samizar-burgundy' : 'text-[#ae939a] hover:text-[#f9dbe2]'}`}
             >
               {tab}
             </button>
@@ -151,8 +151,8 @@ export default function Dashboard() {
           {activeTab === 'memories' && (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {memories.map(mem => (
-                <div key={mem.id} className="bg-white p-3 rounded-lg shadow-sm border border-gray-100 group relative">
-                  <div className="w-full h-48 bg-gray-100 rounded-md overflow-hidden mb-3">
+                <div key={mem.id} className="bg-[#4a2530] p-3 rounded-lg shadow-sm border border-[#613c45] group relative">
+                  <div className="w-full h-48 bg-[#5a2d3a] rounded-md overflow-hidden mb-3">
                     <img src={mem.image_url} alt="memory" className="w-full h-full object-cover" />
                   </div>
                   <input 
@@ -160,15 +160,15 @@ export default function Dashboard() {
                     defaultValue={mem.caption || ''} 
                     onBlur={(e) => supabase.from('memories').update({ caption: e.target.value }).eq('id', mem.id)}
                     placeholder="Izoh yozing..."
-                    className="w-full text-sm font-serif italic text-gray-700 bg-transparent border-b border-dashed border-gray-300 focus:outline-none focus:border-samizar-rosegold px-1 py-1"
+                    className="w-full text-sm font-serif italic text-white bg-transparent border-b border-dashed border-[#9f8d87] focus:outline-none focus:border-[#c88c75] px-1 py-1"
                   />
-                  <button onClick={() => handleDeleteMemory(mem.id)} className="absolute top-5 right-5 p-2 bg-white/80 backdrop-blur-sm rounded-full text-red-500 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-white shadow-md">
+                  <button onClick={() => handleDeleteMemory(mem.id)} className="absolute top-5 right-5 p-2 bg-[#4a2530]/80 backdrop-blur-sm rounded-full text-red-500 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-[#4a2530] shadow-md">
                     <Trash2 size={16} />
                   </button>
                 </div>
               ))}
               
-              <label className="bg-gray-50 border-2 border-dashed border-gray-200 rounded-lg flex flex-col items-center justify-center h-[260px] text-gray-400 hover:text-samizar-rosegold hover:border-samizar-rosegold hover:bg-samizar-rosegold/5 transition-all cursor-pointer">
+              <label className="bg-[#341820] border-2 border-dashed border-[#613c45] rounded-lg flex flex-col items-center justify-center h-[260px] text-[#ae939a] hover:text-[#c88c75] hover:border-[#c88c75] hover:bg-[#c88c75]/5 transition-all cursor-pointer">
                 {uploading ? <Loader2 size={32} className="animate-spin mb-2" /> : <Plus size={32} className="mb-2" />}
                 <span className="font-medium">{uploading ? 'Yuklanmoqda...' : 'Rasm Yuklash'}</span>
                 <input type="file" accept="image/*,video/*" className="hidden" onChange={handleImageUpload} disabled={uploading} />
@@ -178,24 +178,24 @@ export default function Dashboard() {
 
           {activeTab === 'coupons' && (
             <div className="max-w-2xl">
-              <button onClick={handleAddCoupon} className="mb-6 bg-samizar-rosegold/10 text-samizar-burgundy px-4 py-2 rounded-md font-medium border border-samizar-rosegold/30 hover:bg-samizar-rosegold/20 transition-all">
+              <button onClick={handleAddCoupon} className="mb-6 bg-[#c88c75]/10 text-white px-4 py-2 rounded-md font-medium border border-[#c88c75]/30 hover:bg-[#c88c75]/20 transition-all">
                 + Yangi Kupon Qo'shish
               </button>
               <div className="space-y-4">
                 {coupons.map(coupon => (
-                  <div key={coupon.id} className="flex items-center justify-between p-5 bg-white border border-gray-100 rounded-lg shadow-sm">
+                  <div key={coupon.id} className="flex items-center justify-between p-5 bg-[#4a2530] border border-[#613c45] rounded-lg shadow-sm">
                     <div>
-                      <h3 className="font-medium text-samizar-dark">{coupon.title}</h3>
-                      <span className={`text-xs font-semibold px-2 py-1 rounded-full mt-2 inline-block ${coupon.isClaimed ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>
+                      <h3 className="font-medium text-white">{coupon.title}</h3>
+                      <span className={`text-xs font-semibold px-2 py-1 rounded-full mt-2 inline-block ${coupon.isClaimed ? 'bg-green-100 text-green-700' : 'bg-[#5a2d3a] text-[#f9dbe2]'}`}>
                         {coupon.isClaimed ? 'Claimed by Her' : 'Unclaimed'}
                       </span>
                     </div>
                     <div className="flex items-center gap-3">
-                      <button onClick={() => handleDeleteCoupon(coupon.id)} className="p-2 text-gray-400 hover:text-red-500 transition-colors"><Trash2 size={18}/></button>
+                      <button onClick={() => handleDeleteCoupon(coupon.id)} className="p-2 text-[#ae939a] hover:text-red-500 transition-colors"><Trash2 size={18}/></button>
                     </div>
                   </div>
                 ))}
-                {coupons.length === 0 && <p className="text-gray-400">Hali kupon qo'shilmagan.</p>}
+                {coupons.length === 0 && <p className="text-[#ae939a]">Hali kupon qo'shilmagan.</p>}
               </div>
             </div>
           )}
@@ -203,18 +203,18 @@ export default function Dashboard() {
           {activeTab === 'settings' && (
             <form onSubmit={handleUpdateProfile} className="max-w-lg space-y-6">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Spotify Playlist URL (ixtiyoriy)</label>
-                <input type="text" value={profile.spotify_url || ''} onChange={e => setProfile({...profile, spotify_url: e.target.value})} placeholder="https://open.spotify.com/..." className="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-samizar-rosegold" />
+                <label className="block text-sm font-medium text-white mb-2">Spotify Playlist URL (ixtiyoriy)</label>
+                <input type="text" value={profile.spotify_url || ''} onChange={e => setProfile({...profile, spotify_url: e.target.value})} placeholder="https://open.spotify.com/..." className="w-full p-3 border border-[#9f8d87] rounded-md focus:outline-none focus:ring-1 focus:ring-[#c88c75]" />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Ismlar (Masalan: Sardor & Malika)</label>
-                <input type="text" value={profile.couple_names || ''} onChange={e => setProfile({...profile, couple_names: e.target.value})} className="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-samizar-rosegold" />
+                <label className="block text-sm font-medium text-white mb-2">Ismlar (Masalan: Sardor & Malika)</label>
+                <input type="text" value={profile.couple_names || ''} onChange={e => setProfile({...profile, couple_names: e.target.value})} className="w-full p-3 border border-[#9f8d87] rounded-md focus:outline-none focus:ring-1 focus:ring-[#c88c75]" />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Sana (Masalan: Est. 2024)</label>
-                <input type="text" value={profile.est_date || ''} onChange={e => setProfile({...profile, est_date: e.target.value})} className="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-samizar-rosegold" />
+                <label className="block text-sm font-medium text-white mb-2">Sana (Masalan: Est. 2024)</label>
+                <input type="text" value={profile.est_date || ''} onChange={e => setProfile({...profile, est_date: e.target.value})} className="w-full p-3 border border-[#9f8d87] rounded-md focus:outline-none focus:ring-1 focus:ring-[#c88c75]" />
               </div>
-              <button type="submit" className="bg-samizar-dark text-white px-6 py-3 rounded-md font-medium w-full mt-4 hover:bg-black transition-colors">
+              <button type="submit" className="bg-[#4a2530] text-white px-6 py-3 rounded-md font-medium w-full mt-4 hover:bg-black transition-colors">
                 Saqlash
               </button>
             </form>
