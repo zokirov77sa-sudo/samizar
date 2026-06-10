@@ -24,15 +24,9 @@ export default function Login() {
     setError('');
     
     try {
-      if (isLogin) {
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
-        if (error) throw error;
-        navigate('/dashboard');
-      } else {
-        const { error } = await supabase.auth.signUp({ email, password });
-        if (error) throw error;
-        setError('Muvaffaqiyatli! Endi emailga tasdiq xati yuborildi (yoki to\'g\'ridan-to\'g\'ri kiring).');
-      }
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) throw error;
+      navigate('/dashboard');
     } catch (err) {
       setError(err.message || "Xatolik yuz berdi.");
     } finally {
@@ -100,16 +94,9 @@ export default function Login() {
               disabled={loading} 
               className="w-full flex items-center justify-center gap-2 py-3 rounded-xl font-medium text-samizar-dark bg-gradient-to-r from-samizar-rosegold to-[#e2b19e] shadow-[0_4px_20px_rgba(200,140,117,0.3)] hover:opacity-90 transition-opacity"
             >
-              {loading ? <Loader2 size={18} className="animate-spin" /> : (isLogin ? <LogIn size={18} /> : <UserPlus size={18} />)}
-              {isLogin ? 'Tizimga kirish' : 'Ro\'yxatdan o\'tish'}
+              {loading ? <Loader2 size={18} className="animate-spin" /> : <LogIn size={18} />}
+              Tizimga kirish
             </button>
-            
-            <p className="text-center mt-6 text-sm text-samizar-rosegold/60">
-              {isLogin ? "Akkauntingiz yo'qmi? " : "Akkauntingiz bormi? "}
-              <button type="button" onClick={() => setIsLogin(!isLogin)} className="text-samizar-rosegold font-medium hover:underline">
-                {isLogin ? "Ro'yxatdan o'ting" : "Kirish"}
-              </button>
-            </p>
           </form>
         </div>
       </div>
