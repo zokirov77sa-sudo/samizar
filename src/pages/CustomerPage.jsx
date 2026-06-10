@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { supabase } from '../supabase';
 import { Heart, Gem, ExternalLink, Sparkles, ChevronLeft, ChevronRight, ZoomIn, X } from 'lucide-react';
-
+import LivingAlbum from '../components/LivingAlbum';
+import QRRegistration from '../components/QRRegistration';
 export default function CustomerPage() {
   const { id } = useParams();
   const [item, setItem] = useState(null);
@@ -89,6 +90,14 @@ export default function CustomerPage() {
   const isSold = item.status === 'sold';
   const hasMedia = media.length > 0;
   const displayLink = item.customerLink || item.url;
+
+  if (isSold && item.user_id) {
+    return <LivingAlbum userId={item.user_id} />;
+  }
+
+  if (!isSold) {
+    return <QRRegistration qrLink={item} onRegistered={fetchData} />;
+  }
 
   return (
     <div style={styles.page}>
@@ -227,15 +236,6 @@ export default function CustomerPage() {
             </div>
           )}
 
-          {/* AVAILABLE — Info message */}
-          {!isSold && (
-            <div style={styles.availableInfo}>
-              <Heart size={20} color="#d4af37" />
-              <p style={styles.availableText}>
-                Bu buyum hozirda sotuvda. Bizning do'konimizga tashrif buyuring yoki bog'laning.
-              </p>
-            </div>
-          )}
         </div>
 
         {/* Footer */}
