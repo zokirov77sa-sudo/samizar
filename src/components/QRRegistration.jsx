@@ -56,8 +56,8 @@ export default function QRRegistration({ qrLink, onRegistered }) {
       const { error: qrError } = await supabase.from('qr_links').update({
         status: 'sold',
         user_id: user.id,
-        soldAt: new Date().toISOString(),
-        customerEmail: formData.email
+        soldat: new Date().toISOString(),
+        customeremail: formData.email
       }).eq('id', qrLink.id);
 
       if (qrError) throw qrError;

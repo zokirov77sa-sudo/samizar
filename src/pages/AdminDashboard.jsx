@@ -102,9 +102,16 @@ export default function Dashboard() {
     try {
       const { data, error } = await supabase.from('qr_links').select('*');
       if (error) throw error;
-      setLinks(data || []);
-      // Removed automatic subcollection count fetching as it exhausts Firebase quotas.
-      // Recommend storing count in the main document instead.
+      const mappedData = (data || []).map(item => ({
+        ...item,
+        productCode: item.productcode || item.productCode,
+        createdAt: item.createdat || item.createdAt,
+        updatedAt: item.updatedat || item.updatedAt,
+        soldAt: item.soldat || item.soldAt,
+        customerEmail: item.customeremail || item.customerEmail,
+        customerLink: item.customerlink || item.customerLink
+      }));
+      setLinks(mappedData);
     } catch (e) {
       console.error("Fetch error:", e);
       alert("Ma'lumotlarni yuklashda xatolik yuz berdi. Iltimos, internetni tekshiring.");
@@ -159,8 +166,8 @@ export default function Dashboard() {
     try {
       await supabase.from('qr_links').update({
         status: newStatus,
-        soldAt: newStatus === 'sold' ? new Date().toISOString() : null,
-        customerEmail: newStatus === 'sold' ? (link.customerEmail || 'admin-manual@bmc.uz') : null
+        soldat: newStatus === 'sold' ? new Date().toISOString() : null,
+        customeremail: newStatus === 'sold' ? (link.customerEmail || 'admin-manual@bmc.uz') : null
       }).eq('id', link.id);
       await fetchLinks();
     } catch (e) { alert("Xatolik yuz berdi"); }
@@ -182,10 +189,10 @@ export default function Dashboard() {
       const qrData = {
         title: formData.title || 'Nomsiz',
         url: formData.url || '',
-        productCode: formData.productCode,
+        productcode: formData.productCode,
         price: formData.price || '',
         material: formData.material,
-        updatedAt: new Date().toISOString()
+        updatedat: new Date().toISOString()
       };
       if (editingId) {
         await supabase.from('qr_links').update(qrData).eq('id', editingId);
@@ -195,7 +202,7 @@ export default function Dashboard() {
           id: newId,
           ...qrData,
           status: 'available',
-          createdAt: new Date().toISOString()
+          createdat: new Date().toISOString()
         });
       }
       setIsModalOpen(false);
@@ -211,10 +218,10 @@ export default function Dashboard() {
       const qrData = {
         title: formData.title || 'Nomsiz',
         url: formData.url || '',
-        productCode: formData.productCode,
+        productcode: formData.productCode,
         price: formData.price || '',
         material: formData.material,
-        updatedAt: new Date().toISOString()
+        updatedat: new Date().toISOString()
       };
       let finalId = editingId;
       if (editingId) {
@@ -225,7 +232,7 @@ export default function Dashboard() {
           id: finalId,
           ...qrData,
           status: 'available',
-          createdAt: new Date().toISOString()
+          createdat: new Date().toISOString()
         });
       }
       await fetchLinks();
@@ -257,12 +264,12 @@ export default function Dashboard() {
         const item = {
           id,
           title: bulkForm.title || `Ommaviy ${code}`,
-          productCode: code,
+          productcode: code,
           material: bulkForm.material,
           price: '',
           url: '',
           status: 'available',
-          createdAt: new Date().toISOString()
+          createdat: new Date().toISOString()
         };
 
         const { error } = await supabase.from('qr_links').insert(item);

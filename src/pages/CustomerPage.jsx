@@ -31,7 +31,17 @@ export default function CustomerPage() {
         return;
       }
 
-      setItem(data);
+      const mappedData = {
+        ...data,
+        productCode: data.productcode || data.productCode,
+        createdAt: data.createdat || data.createdAt,
+        updatedAt: data.updatedat || data.updatedAt,
+        soldAt: data.soldat || data.soldAt,
+        customerEmail: data.customeremail || data.customerEmail,
+        customerLink: data.customerlink || data.customerLink,
+        customerMessage: data.customermessage || data.customerMessage
+      };
+      setItem(mappedData);
 
       let mediaItems = [];
       try {
