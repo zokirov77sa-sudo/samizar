@@ -180,7 +180,7 @@ export default function Dashboard() {
         title: formData.title || 'Nomsiz',
         url: formData.url || '',
         productCode: formData.productCode,
-        price: formData.price ? parseFloat(formData.price) : null,
+        price: formData.price || '',
         material: formData.material,
         updatedAt: new Date().toISOString()
       };
@@ -209,7 +209,7 @@ export default function Dashboard() {
         title: formData.title || 'Nomsiz',
         url: formData.url || '',
         productCode: formData.productCode,
-        price: formData.price ? parseFloat(formData.price) : null,
+        price: formData.price || '',
         material: formData.material,
         updatedAt: new Date().toISOString()
       };
@@ -253,7 +253,7 @@ export default function Dashboard() {
           title: bulkForm.title || `Ommaviy ${code}`,
           productCode: code,
           material: bulkForm.material,
-          price: null,
+          price: '',
           url: '',
           status: 'available',
           createdAt: new Date().toISOString()
