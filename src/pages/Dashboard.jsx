@@ -3,15 +3,18 @@ import { motion } from 'framer-motion';
 import { Heart, Plus, Trash2, Edit2, LogOut, Loader2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../supabase';
+import AdminDashboard from './AdminDashboard';
 
 export default function Dashboard() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('memories');
   const [user, setUser] = useState(null);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [memories, setMemories] = useState([]);
   const [coupons, setCoupons] = useState([]);
   const [profile, setProfile] = useState({ couple_names: '', est_date: '', spotify_url: '' });
   const [loading, setLoading] = useState(true);
+  const [uploading, setUploading] = useState(false);
   const [uploading, setUploading] = useState(false);
 
   useEffect(() => {
@@ -23,6 +26,12 @@ export default function Dashboard() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return navigate('/login');
     setUser(user);
+
+    if (user.email === 'admin@samizar.uz' || user.email === 'bmcqr@admin.com') {
+      setIsAdmin(true);
+      setLoading(false);
+      return;
+    }
 
     // Fetch Profile
     const { data: profileData } = await supabase.from('profiles').select('*').eq('id', user.id).single();
@@ -89,6 +98,10 @@ export default function Dashboard() {
   };
 
   if (loading) return <div className="min-h-screen flex items-center justify-center"><Loader2 className="animate-spin text-samizar-rosegold" size={40}/></div>;
+
+  if (isAdmin) {
+    return <AdminDashboard />;
+  }
 
   const mockCoupons = [
     { id: 1, title: "Free Coffee Date!", isClaimed: true },
