@@ -25,21 +25,38 @@ export default function Dashboard() {
   useEffect(() => {
     fetchData();
 
-    // Capture PWA install prompt
+    // Check if it was captured before React mounted
+    if (window.deferredPWA) {
+      setDeferredPrompt(window.deferredPWA);
+    }
+
+    // Listen for the custom event in case it fires after mount
+    const handlePwaReady = () => {
+      setDeferredPrompt(window.deferredPWA);
+    };
+    window.addEventListener('pwa-ready', handlePwaReady);
+
+    // Also listen to the original event just in case
     const handleBeforeInstallPrompt = (e) => {
       e.preventDefault();
+      window.deferredPWA = e;
       setDeferredPrompt(e);
     };
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
 
-    return () => window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    return () => {
+      window.removeEventListener('pwa-ready', handlePwaReady);
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    };
   }, []);
 
   const handleInstallApp = async () => {
-    if (deferredPrompt) {
-      deferredPrompt.prompt();
-      const { outcome } = await deferredPrompt.userChoice;
+    const promptEvent = window.deferredPWA || deferredPrompt;
+    if (promptEvent) {
+      promptEvent.prompt();
+      const { outcome } = await promptEvent.userChoice;
       if (outcome === 'accepted') {
+        window.deferredPWA = null;
         setDeferredPrompt(null);
       }
     } else {
