@@ -8,8 +8,9 @@ export default function LivingAlbum({ userId }) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [scratched, setScratched] = useState({});
   const [loading, setLoading] = useState(true);
-  const [showPlayer, setShowPlayer] = useState(false);
+  const [showPlayer, setShowPlayer] = useState(true); // Default show player
   const [playingVoice, setPlayingVoice] = useState(false);
+  const [quizModal, setQuizModal] = useState({ open: false, coupon: null, question: '', answer: '', input: '', error: '' });
 
   const [profile, setProfile] = useState(null);
   const [memories, setMemories] = useState([]);
@@ -74,6 +75,37 @@ export default function LivingAlbum({ userId }) {
     await supabase.from('coupons').update({ is_claimed: true }).eq('id', couponId);
   };
 
+  const attemptCoupon = (coupon) => {
+    if (coupon.is_claimed || scratched[coupon.id]) return;
+    
+    let isQuiz = false;
+    let question = '';
+    let answer = '';
+    try {
+      const parsed = JSON.parse(coupon.title);
+      if (parsed.name && parsed.q && parsed.a) {
+        isQuiz = true;
+        question = parsed.q;
+        answer = parsed.a;
+      }
+    } catch(e) {}
+
+    if (isQuiz) {
+      setQuizModal({ open: true, coupon, question, answer, input: '', error: '' });
+    } else {
+      handleScratch(coupon.id);
+    }
+  };
+
+  const submitQuiz = () => {
+    if (quizModal.input.trim().toLowerCase() === quizModal.answer.trim().toLowerCase()) {
+      handleScratch(quizModal.coupon.id);
+      setQuizModal({ open: false, coupon: null, question: '', answer: '', input: '', error: '' });
+    } else {
+      setQuizModal({ ...quizModal, error: 'Notog\'ri javob! Qayta urinib ko\'ring.' });
+    }
+  };
+
   if (loading) {
     return <div className="min-h-screen bg-[#111] flex items-center justify-center"><Loader2 className="text-[#c88c75] animate-spin" size={40}/></div>;
   }
@@ -84,24 +116,29 @@ export default function LivingAlbum({ userId }) {
 
   const getEmbedUrl = (url) => {
     if (!url) return null;
+    if (url.match(/\.(mp3|wav|m4a|ogg)$/i)) {
+      return { type: 'audio', url };
+    }
     if (url.includes('spotify.com/track/')) {
       const id = url.split('track/')[1].split('?')[0];
-      return `https://open.spotify.com/embed/track/${id}?utm_source=generator`;
+      return { type: 'iframe', url: `https://open.spotify.com/embed/track/${id}?utm_source=generator` };
     }
-    if (url.includes('music.yandex.ru')) {
+    if (url.includes('yandex')) {
       const albumMatch = url.match(/album\/(\d+)/);
       const trackMatch = url.match(/track\/(\d+)/);
       if (albumMatch && trackMatch) {
-        return `https://music.yandex.ru/iframe/#track/${trackMatch[1]}/${albumMatch[1]}`;
+        return { type: 'iframe', url: `https://music.yandex.ru/iframe/#track/${trackMatch[1]}/${albumMatch[1]}` };
+      } else if (trackMatch) {
+        return { type: 'iframe', url: `https://music.yandex.ru/iframe/#track/${trackMatch[1]}` };
       }
     }
     return null;
   };
 
-  const embedUrl = getEmbedUrl(musicUrl);
+  const embedData = getEmbedUrl(musicUrl);
 
   const toggleMusic = () => {
-    if (embedUrl) {
+    if (embedData) {
       setShowPlayer(!showPlayer);
     } else if (musicUrl) {
       window.open(musicUrl, '_blank');
@@ -164,21 +201,28 @@ export default function LivingAlbum({ userId }) {
       )}
 
       {/* Embedded Player */}
-      {showPlayer && embedUrl && (
+      {showPlayer && embedData && (
         <motion.div 
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="fixed top-24 left-1/2 -translate-x-1/2 w-[90%] max-w-sm z-50 rounded-xl overflow-hidden shadow-2xl"
+          className="fixed top-24 left-1/2 -translate-x-1/2 w-[90%] max-w-sm z-50 rounded-xl overflow-hidden shadow-2xl bg-[#111] border border-white/10"
         >
-          <iframe 
-            src={embedUrl} 
-            width="100%" 
-            height={embedUrl.includes('yandex') ? "150" : "152"} 
-            frameBorder="0" 
-            allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" 
-            loading="lazy"
-            style={{ borderRadius: '12px' }}
-          ></iframe>
+          {embedData.type === 'iframe' ? (
+            <iframe 
+              src={embedData.url} 
+              width="100%" 
+              height={embedData.url.includes('yandex') ? "150" : "152"} 
+              frameBorder="0" 
+              allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" 
+              loading="lazy"
+              style={{ borderRadius: '12px' }}
+            ></iframe>
+          ) : (
+            <div className="p-4 flex flex-col gap-2">
+              <span className={`text-xs ${currentTheme.accent} font-bold uppercase tracking-widest`}>FONDAGI MUSIQA</span>
+              <audio controls src={embedData.url} className="w-full h-10 outline-none" />
+            </div>
+          )}
         </motion.div>
       )}
 
@@ -237,17 +281,28 @@ export default function LivingAlbum({ userId }) {
           <h2 className="font-serif text-3xl text-[#fdfcfc] mb-8 text-center">Your Love <br/> Coupons</h2>
           
           <div className="flex flex-col gap-4">
-            {coupons.map((coupon, idx) => (
+            {coupons.map((coupon, idx) => {
+              let displayTitle = coupon.title;
+              let isQuiz = false;
+              try {
+                const parsed = JSON.parse(coupon.title);
+                if (parsed.name) {
+                  displayTitle = parsed.name;
+                  isQuiz = true;
+                }
+              } catch(e) {}
+
+              return (
               <div 
                 key={coupon.id}
-                onClick={() => !coupon.is_claimed && !scratched[coupon.id] && handleScratch(coupon.id)}
+                onClick={() => attemptCoupon(coupon)}
                 className="relative h-24 rounded-lg overflow-hidden cursor-pointer group"
               >
                 {/* Underneath (Revealed state) */}
                 <div className={`absolute inset-0 bg-[#141414] border ${currentTheme.border} rounded-lg flex items-center justify-between px-6`}>
                   <div>
                     <p className={`${currentTheme.accent} opacity-60 text-xs tracking-wider mb-1`}>COUPON #{String(idx + 1).padStart(3, '0')}</p>
-                    <p className="text-[#fdfcfc] font-medium">{coupon.title}</p>
+                    <p className="text-[#fdfcfc] font-medium">{displayTitle}</p>
                   </div>
                   <div className={`w-10 h-10 rounded-full ${currentTheme.accentLight} flex items-center justify-center ${currentTheme.accent}`}>
                     <Heart size={16} className={scratched[coupon.id] || coupon.is_claimed ? "fill-current" : ""} />
@@ -267,10 +322,11 @@ export default function LivingAlbum({ userId }) {
                   <div className="flex items-center gap-2 text-[#111]/80 font-medium tracking-wide">
                     {coupon.is_claimed ? <Unlock size={16} /> : <Lock size={16} />}
                     <span>{coupon.is_claimed ? "ALREADY CLAIMED" : "SCRATCH TO REVEAL"}</span>
+                    {isQuiz && !coupon.is_claimed && <span className="ml-2 text-[10px] bg-black/20 px-2 py-0.5 rounded-full">VIKTORINA</span>}
                   </div>
                 </motion.div>
               </div>
-            ))}
+            )})}
             {coupons.length === 0 && <p className={`text-center ${currentTheme.accent} opacity-50`}>Hali kuponlar yo'q.</p>}
           </div>
           <style>{`
@@ -281,6 +337,48 @@ export default function LivingAlbum({ userId }) {
         </motion.div>
 
       </main>
+      {/* Quiz Modal */}
+      {quizModal.open && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+          <div className={`w-full max-w-sm ${currentTheme.cardBg} border ${currentTheme.border} p-6 rounded-3xl shadow-2xl`}>
+            <div className={`w-12 h-12 rounded-full ${currentTheme.accentLight} text-[#111] flex items-center justify-center mb-4 ${currentTheme.accent}`}>
+              <Lock size={24} />
+            </div>
+            <h3 className="text-xl font-serif text-white mb-2">Sirli Kupon!</h3>
+            <p className="text-gray-400 text-sm mb-6">Ushbu kuponni ochish uchun savolga to'g'ri javob bering:</p>
+            
+            <div className={`p-4 rounded-xl ${currentTheme.accentLight} border ${currentTheme.border} mb-6`}>
+              <p className={`text-sm ${currentTheme.accent} font-medium`}>{quizModal.question}</p>
+            </div>
+
+            <input 
+              type="text" 
+              value={quizModal.input}
+              onChange={e => setQuizModal({...quizModal, input: e.target.value})}
+              placeholder="Javobingiz..."
+              className={`w-full bg-[#111] border ${currentTheme.border} rounded-xl px-4 py-3 text-white focus:outline-none focus:border-white transition-colors mb-2`}
+            />
+            {quizModal.error && <p className="text-red-400 text-xs mb-4">{quizModal.error}</p>}
+            {!quizModal.error && <div className="mb-4"></div>}
+
+            <div className="flex gap-3">
+              <button 
+                onClick={() => setQuizModal({ ...quizModal, open: false })}
+                className="flex-1 py-3 rounded-xl border border-white/10 text-gray-300 font-medium hover:bg-white/5 transition-colors"
+              >
+                Bekor qilish
+              </button>
+              <button 
+                onClick={submitQuiz}
+                className={`flex-1 py-3 rounded-xl ${currentTheme.accentBg} text-[#111] font-bold hover:opacity-90 transition-opacity`}
+              >
+                Tekshirish
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

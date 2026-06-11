@@ -177,14 +177,18 @@ export default function Dashboard() {
     let quizQuestion = null;
     let quizAnswer = null;
     
+    let finalTitle = title;
     if (wantsQuiz) {
       quizQuestion = prompt("Qiz uchun savol (Masalan: Biz birinchi marta qayerda uchrashganmiz?):");
       quizAnswer = prompt("To'g'ri javob:");
+      if (quizQuestion && quizAnswer) {
+        finalTitle = JSON.stringify({ name: title, q: quizQuestion, a: quizAnswer });
+      }
     }
 
     await supabase.from('coupons').insert([{ 
       user_id: user.id, 
-      title,
+      title: finalTitle,
     }]);
     fetchData();
   };
@@ -490,14 +494,25 @@ export default function Dashboard() {
               </header>
 
               <div className="grid gap-4 max-w-4xl">
-                {coupons.map(coupon => (
+                {coupons.map(coupon => {
+                  let displayTitle = coupon.title;
+                  let isQuiz = false;
+                  try {
+                    const parsed = JSON.parse(coupon.title);
+                    if (parsed.name) {
+                      displayTitle = parsed.name;
+                      isQuiz = true;
+                    }
+                  } catch(e) {}
+                  
+                  return (
                   <div key={coupon.id} className="flex items-center justify-between p-6 bg-white/5 backdrop-blur-xl border border-white/10 rounded-[24px] group hover:bg-white/10 transition-colors">
                     <div className="flex items-center gap-6">
                       <div className={`w-16 h-16 rounded-full flex items-center justify-center shadow-inner ${coupon.is_claimed ? 'bg-green-500/20 text-green-400' : 'bg-gradient-to-br from-[#c88c75]/20 to-[#a36954]/20 text-[#e2b19e]'}`}>
                         <Gift size={28} strokeWidth={1.5} />
                       </div>
                       <div>
-                        <h3 className="text-xl font-medium text-white mb-2">{coupon.title}</h3>
+                        <h3 className="text-xl font-medium text-white mb-2">{displayTitle} {isQuiz && <span className="text-xs ml-2 text-[#d4af37] border border-[#d4af37]/30 px-2 py-0.5 rounded-full">Viktorina</span>}</h3>
                         <span className={`text-xs uppercase tracking-[0.1em] font-bold px-3 py-1.5 rounded-lg ${coupon.is_claimed ? 'bg-green-500/20 text-green-400' : 'bg-white/10 text-gray-400'}`}>
                           {coupon.is_claimed ? 'Ishlatilgan' : 'Kutmoqda'}
                         </span>
@@ -507,7 +522,7 @@ export default function Dashboard() {
                       <Trash2 size={20}/>
                     </button>
                   </div>
-                ))}
+                )})}
                 {coupons.length === 0 && (
                   <div className="py-20 text-center text-gray-500 border-2 border-dashed border-white/10 rounded-[32px] bg-white/5">
                     <div className="w-24 h-24 rounded-full bg-white/5 mx-auto flex items-center justify-center mb-6">
