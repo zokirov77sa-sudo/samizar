@@ -15,7 +15,7 @@ export default function Dashboard() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [memories, setMemories] = useState([]);
   const [coupons, setCoupons] = useState([]);
-  const [profile, setProfile] = useState({ couple_names: '', est_date: '', spotify_url: '', theme: 'dark', is_premium: false });
+  const [profile, setProfile] = useState({ couple_names: '', est_date: '', spotify_url: '', theme: 'dark', is_premium: false, voice_memo_url: '' });
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -143,9 +143,30 @@ export default function Dashboard() {
       couple_names: profile.couple_names,
       est_date: profile.est_date,
       spotify_url: profile.spotify_url,
-      theme: profile.theme
+      theme: profile.theme,
+      voice_memo_url: profile.voice_memo_url
     }).eq('id', user.id);
     alert('Sozlamalar muvaffaqiyatli saqlandi!');
+  };
+
+  const handleAudioUpload = async (e) => {
+    if (!profile.is_premium) {
+      alert("Ovozli xabar faqat Premium tarifda mavjud!");
+      setActiveTab('premium');
+      return;
+    }
+    const file = e.target.files[0];
+    if (!file) return;
+    setUploading(true);
+    const fileExt = file.name.split('.').pop();
+    const fileName = `voice_${Math.random()}.${fileExt}`;
+    const filePath = `${user.id}/${fileName}`;
+    const { error: uploadError } = await supabase.storage.from('memories_bucket').upload(filePath, file);
+    if (!uploadError) {
+      const { data } = supabase.storage.from('memories_bucket').getPublicUrl(filePath);
+      setProfile({ ...profile, voice_memo_url: data.publicUrl });
+    }
+    setUploading(false);
   };
 
   const handleAddCoupon = async () => {
@@ -314,7 +335,7 @@ export default function Dashboard() {
                   <button onClick={handleInstallApp} className="flex items-center justify-center gap-3 bg-gradient-to-r from-[#c88c75] to-[#a36954] hover:from-[#e2b19e] hover:to-[#c88c75] text-white px-8 py-4 rounded-2xl font-medium shadow-[0_10px_30px_rgba(200,140,117,0.3)] transition-all duration-300 transform hover:-translate-y-1">
                     <Smartphone size={20} /> App Qilib O'rnatish
                   </button>
-                  <button onClick={() => window.open(`/${user.id}`, '_blank')} className="flex items-center justify-center gap-3 bg-white/10 hover:bg-white/20 backdrop-blur-md border border-white/20 text-white px-8 py-4 rounded-2xl font-medium transition-all duration-300">
+                  <button onClick={() => navigate('/preview')} className="flex items-center justify-center gap-3 bg-white/10 hover:bg-white/20 backdrop-blur-md border border-white/20 text-white px-8 py-4 rounded-2xl font-medium transition-all duration-300">
                     Albomni Ko'rish
                   </button>
                 </div>
@@ -564,6 +585,23 @@ export default function Dashboard() {
                   <label className="block text-sm font-medium text-gray-400 mb-3 uppercase tracking-widest">Fonda chalinuvchi musiqa</label>
                   <input type="text" value={profile.spotify_url || ''} onChange={e => setProfile({...profile, spotify_url: e.target.value})} placeholder="Yandex Music yoki Spotify Linki..." className="w-full p-5 bg-[#111]/50 backdrop-blur-md border border-white/10 rounded-2xl focus:outline-none focus:border-[#e2b19e] text-white text-lg transition-colors placeholder:text-gray-600" />
                   <p className="text-sm text-gray-500 mt-3 font-light">Ushbu musiqa albom ochilganda tepada pleyer orqali tinglanadi.</p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-400 mb-3 uppercase tracking-widest">Ovozli Xabar (Voice Memo)</label>
+                  {profile.voice_memo_url ? (
+                    <div className="flex items-center gap-4 mb-4 p-4 bg-[#111]/50 backdrop-blur-md border border-white/10 rounded-2xl">
+                      <audio controls src={profile.voice_memo_url} className="w-full outline-none" />
+                      <button type="button" onClick={() => { if(confirm('Ovozli xabarni o`chirishga ishonchingiz komilmi?')) setProfile({...profile, voice_memo_url: null}) }} className="p-3 text-red-400 hover:text-red-300 hover:bg-red-500/20 rounded-xl transition-colors">
+                        <Trash2 size={20} />
+                      </button>
+                    </div>
+                  ) : (
+                    <label className="flex items-center justify-center gap-3 w-full p-5 bg-[#111]/50 backdrop-blur-md border border-dashed border-white/20 rounded-2xl cursor-pointer hover:bg-white/5 transition-colors text-gray-400">
+                      <input type="file" accept="audio/*" onChange={handleAudioUpload} disabled={uploading} className="hidden" />
+                      {uploading ? <><Loader2 size={20} className="animate-spin" /> Yuklanmoqda...</> : "Audio fayl tanlang (.mp3, .m4a, .wav)"}
+                    </label>
+                  )}
+                  <p className="text-sm text-gray-500 mt-3 font-light">Ushbu ovozli xabar qiz albomga kirganda fonda yangraydi (Faqat Premium).</p>
                 </div>
                 <div className="pt-6 border-t border-white/10">
                   <button type="submit" className="bg-gradient-to-r from-[#c88c75] to-[#a36954] hover:from-[#e2b19e] hover:to-[#c88c75] text-white px-10 py-5 rounded-2xl font-medium shadow-[0_10px_30px_rgba(200,140,117,0.3)] w-full text-lg transition-all duration-300 transform hover:-translate-y-1">

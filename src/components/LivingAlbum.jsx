@@ -9,10 +9,36 @@ export default function LivingAlbum({ userId }) {
   const [scratched, setScratched] = useState({});
   const [loading, setLoading] = useState(true);
   const [showPlayer, setShowPlayer] = useState(false);
+  const [playingVoice, setPlayingVoice] = useState(false);
 
   const [profile, setProfile] = useState(null);
   const [memories, setMemories] = useState([]);
   const [coupons, setCoupons] = useState([]);
+
+  const themeTokens = {
+    dark: {
+      bg: 'bg-[#3b1c24]',
+      text: 'text-[#fdfcfc]',
+      accent: 'text-[#c88c75]',
+      accentBg: 'bg-[#c88c75]',
+      accentLight: 'bg-[#c88c75]/20',
+      border: 'border-[#c88c75]/30',
+      glow: 'rgba(200,140,117,0.15)',
+      gradientFrom: 'from-[#c88c75]',
+      gradientVia: 'via-[#e2b19e]'
+    },
+    gold: {
+      bg: 'bg-[#111111]',
+      text: 'text-[#fdfcfc]',
+      accent: 'text-[#d4af37]',
+      accentBg: 'bg-[#d4af37]',
+      accentLight: 'bg-[#d4af37]/20',
+      border: 'border-[#d4af37]/30',
+      glow: 'rgba(212,175,55,0.15)',
+      gradientFrom: 'from-[#d4af37]',
+      gradientVia: 'via-[#f1c40f]'
+    }
+  };
 
   useEffect(() => {
     async function fetchData() {
@@ -49,11 +75,12 @@ export default function LivingAlbum({ userId }) {
   };
 
   if (loading) {
-    return <div className="min-h-screen bg-[#3b1c24] flex items-center justify-center"><Loader2 className="text-[#c88c75] animate-spin" size={40}/></div>;
+    return <div className="min-h-screen bg-[#111] flex items-center justify-center"><Loader2 className="text-[#c88c75] animate-spin" size={40}/></div>;
   }
 
-  const displayProfile = profile || { couple_names: 'Sizning Albomingiz', est_date: new Date().getFullYear().toString() };
+  const displayProfile = profile || { couple_names: 'Sizning Albomingiz', est_date: new Date().getFullYear().toString(), theme: 'dark', voice_memo_url: '' };
   const musicUrl = displayProfile.spotify_url || '';
+  const currentTheme = themeTokens[displayProfile.theme] || themeTokens.dark;
 
   const getEmbedUrl = (url) => {
     if (!url) return null;
@@ -84,29 +111,57 @@ export default function LivingAlbum({ userId }) {
   };
 
   return (
-    <div className="min-h-screen bg-[#3b1c24] font-sans text-[#fdfcfc] overflow-x-hidden selection:bg-[#c88c75] selection:text-[#3b1c24] relative">
+    <div className={`min-h-screen ${currentTheme.bg} font-sans ${currentTheme.text} overflow-x-hidden selection:${currentTheme.accentBg} selection:text-[#111] relative transition-colors duration-1000`}>
       
       {/* Background ambient glow - optimized for performance */}
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-lg h-[500px] pointer-events-none" style={{ background: 'radial-gradient(circle, rgba(200,140,117,0.15) 0%, transparent 60%)' }} />
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-lg h-[500px] pointer-events-none" style={{ background: `radial-gradient(circle, ${currentTheme.glow} 0%, transparent 60%)` }} />
 
       {/* Navbar / Top */}
       <nav className="fixed top-0 w-full p-6 flex justify-between items-center z-50 mix-blend-difference">
         <div className="flex flex-col items-center mx-auto">
-          <Heart className="w-8 h-8 text-[#c88c75] mb-1" strokeWidth={1.5} />
-          <span className="font-serif tracking-[0.3em] text-sm text-[#c88c75] uppercase">Samizar</span>
+          <Heart className={`w-8 h-8 ${currentTheme.accent} mb-1`} strokeWidth={1.5} />
+          <span className={`font-serif tracking-[0.3em] text-sm ${currentTheme.accent} uppercase`}>Samizar</span>
         </div>
         <div className="absolute right-6 flex items-center gap-3">
-          <Link to="/dashboard" className="p-3 rounded-full bg-[#141414]/50 backdrop-blur-md border border-[#c88c75]/30 text-[#c88c75] transition-all hover:bg-[#c88c75]/20">
+          <Link to="/dashboard" className={`p-3 rounded-full bg-[#141414]/50 backdrop-blur-md border ${currentTheme.border} ${currentTheme.accent} transition-all hover:${currentTheme.accentLight}`}>
             <Settings size={18} />
           </Link>
           <button 
             onClick={toggleMusic}
-            className="p-3 rounded-full bg-[#141414]/50 backdrop-blur-md border border-[#c88c75]/30 text-[#c88c75] transition-all hover:bg-[#c88c75]/20"
+            className={`p-3 rounded-full bg-[#141414]/50 backdrop-blur-md border ${currentTheme.border} ${currentTheme.accent} transition-all hover:${currentTheme.accentLight}`}
           >
             {showPlayer ? <Pause size={18} /> : <Play size={18} />}
           </button>
         </div>
       </nav>
+
+      {/* Voice Memo Player */}
+      {displayProfile.voice_memo_url && (
+        <div className={`fixed bottom-6 right-6 z-50`}>
+          <button 
+            onClick={() => {
+              const audio = document.getElementById('voiceMemoAudio');
+              if (playingVoice) { audio.pause(); setPlayingVoice(false); }
+              else { audio.play(); setPlayingVoice(true); }
+            }}
+            className={`flex items-center gap-3 px-5 py-4 rounded-[24px] backdrop-blur-xl border ${currentTheme.border} ${currentTheme.accentLight} shadow-2xl transition-all duration-300 hover:scale-105 group`}
+          >
+            <div className={`w-10 h-10 rounded-full ${currentTheme.accentBg} text-[#111] flex items-center justify-center`}>
+              {playingVoice ? <Pause size={20} className="fill-current" /> : <Play size={20} className="fill-current ml-1" />}
+            </div>
+            <div className="text-left">
+              <p className={`text-xs ${currentTheme.accent} opacity-80 uppercase tracking-widest font-bold mb-0.5`}>Maxsus Xabar</p>
+              <p className="text-white text-sm font-medium">Ovozli yozuvni eshitish</p>
+            </div>
+          </button>
+          <audio 
+            id="voiceMemoAudio" 
+            src={displayProfile.voice_memo_url} 
+            onEnded={() => setPlayingVoice(false)}
+            className="hidden" 
+          />
+        </div>
+      )}
 
       {/* Embedded Player */}
       {showPlayer && embedUrl && (
@@ -136,12 +191,12 @@ export default function LivingAlbum({ userId }) {
           transition={{ duration: 1, ease: "easeOut" }}
           className="text-center mb-16"
         >
-          <p className="text-[#c88c75]/70 text-xs tracking-widest uppercase mb-4">{displayProfile.est_date}</p>
+          <p className={`${currentTheme.accent} opacity-70 text-xs tracking-widest uppercase mb-4`}>{displayProfile.est_date}</p>
           <h1 className="font-serif text-5xl text-[#fdfcfc] mb-4 leading-tight">
             Our <br /> Memories
           </h1>
-          <p className="text-[#c88c75] font-serif italic text-xl">{displayProfile.couple_names}</p>
-          <div className="h-16 w-px bg-gradient-to-b from-[#c88c75]/50 to-transparent mx-auto mt-8" />
+          <p className={`${currentTheme.accent} font-serif italic text-xl`}>{displayProfile.couple_names}</p>
+          <div className={`h-16 w-px bg-gradient-to-b ${currentTheme.gradientFrom} to-transparent mx-auto mt-8 opacity-50`} />
         </motion.div>
 
         {/* Memory Grid (Cascade Style) */}
@@ -164,12 +219,12 @@ export default function LivingAlbum({ userId }) {
                   className="w-full h-full object-cover grayscale-[20%] group-hover:grayscale-0 transition-all duration-500"
                 />
               </div>
-              <p className="absolute bottom-4 left-0 w-full text-center text-[#3b1c24] font-serif italic text-sm">
+              <p className="absolute bottom-4 left-0 w-full text-center text-[#111] font-serif italic text-sm">
                 {mem.caption}
               </p>
             </motion.div>
           ))}
-          {memories.length === 0 && <p className="text-[#c88c75]/50">Xotiralar hali yuklanmagan.</p>}
+          {memories.length === 0 && <p className={`${currentTheme.accent} opacity-50`}>Xotiralar hali yuklanmagan.</p>}
         </div>
 
         {/* Love Coupons Section */}
@@ -189,12 +244,12 @@ export default function LivingAlbum({ userId }) {
                 className="relative h-24 rounded-lg overflow-hidden cursor-pointer group"
               >
                 {/* Underneath (Revealed state) */}
-                <div className="absolute inset-0 bg-[#141414] border border-[#c88c75]/30 rounded-lg flex items-center justify-between px-6">
+                <div className={`absolute inset-0 bg-[#141414] border ${currentTheme.border} rounded-lg flex items-center justify-between px-6`}>
                   <div>
-                    <p className="text-[#c88c75]/60 text-xs tracking-wider mb-1">COUPON #{String(idx + 1).padStart(3, '0')}</p>
+                    <p className={`${currentTheme.accent} opacity-60 text-xs tracking-wider mb-1`}>COUPON #{String(idx + 1).padStart(3, '0')}</p>
                     <p className="text-[#fdfcfc] font-medium">{coupon.title}</p>
                   </div>
-                  <div className="w-10 h-10 rounded-full bg-[#c88c75]/10 flex items-center justify-center text-[#c88c75]">
+                  <div className={`w-10 h-10 rounded-full ${currentTheme.accentLight} flex items-center justify-center ${currentTheme.accent}`}>
                     <Heart size={16} className={scratched[coupon.id] || coupon.is_claimed ? "fill-current" : ""} />
                   </div>
                 </div>
@@ -206,17 +261,17 @@ export default function LivingAlbum({ userId }) {
                     opacity: scratched[coupon.id] || coupon.is_claimed ? 0 : 1,
                     scale: scratched[coupon.id] || coupon.is_claimed ? 1.1 : 1
                   }}
-                  className="absolute inset-0 bg-gradient-to-r from-[#c88c75] via-[#e2b19e] to-[#c88c75] flex items-center justify-center pointer-events-none origin-center"
+                  className={`absolute inset-0 bg-gradient-to-r ${currentTheme.gradientFrom} ${currentTheme.gradientVia} ${currentTheme.gradientFrom} flex items-center justify-center pointer-events-none origin-center`}
                   style={{ backgroundSize: '200% auto', animation: 'shimmer 3s linear infinite' }}
                 >
-                  <div className="flex items-center gap-2 text-[#3b1c24]/80 font-medium tracking-wide">
+                  <div className="flex items-center gap-2 text-[#111]/80 font-medium tracking-wide">
                     {coupon.is_claimed ? <Unlock size={16} /> : <Lock size={16} />}
                     <span>{coupon.is_claimed ? "ALREADY CLAIMED" : "SCRATCH TO REVEAL"}</span>
                   </div>
                 </motion.div>
               </div>
             ))}
-            {coupons.length === 0 && <p className="text-center text-[#c88c75]/50">Hali kuponlar yo'q.</p>}
+            {coupons.length === 0 && <p className={`text-center ${currentTheme.accent} opacity-50`}>Hali kuponlar yo'q.</p>}
           </div>
           <style>{`
             @keyframes shimmer {

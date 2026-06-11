@@ -5,7 +5,7 @@ import Landing from './pages/Landing';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import CustomerPage from './pages/CustomerPage';
-
+import PreviewAlbum from './pages/PreviewAlbum';
 import Migration from './pages/Migration';
 
 function ProtectedRoute({ children }) {
@@ -43,6 +43,7 @@ function App() {
         <Route path="/" element={<Landing />} />
         <Route path="/login" element={<Login />} />
         <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+        <Route path="/preview" element={<ProtectedRoute><PreviewAlbum /></ProtectedRoute>} />
         <Route path="/q/:id" element={<CustomerPage />} />
         <Route path="/migration" element={<Migration />} />
         <Route path="*" element={<Navigate to="/" replace />} />
