@@ -87,6 +87,7 @@ export default function Dashboard() {
   const [adminTab, setAdminTab] = useState('inventory');
   const [payments, setPayments] = useState([]);
   const [promos, setPromos] = useState([]);
+  const [customers, setCustomers] = useState([]);
 
   const navigate = useNavigate();
 
@@ -104,10 +105,11 @@ export default function Dashboard() {
   const fetchAllData = async () => {
     setLoading(true);
     try {
-      const [linksRes, payRes, promoRes] = await Promise.all([
+      const [linksRes, payRes, promoRes, profRes] = await Promise.all([
         supabase.from('qr_links').select('*'),
         supabase.from('payment_requests').select('*').order('created_at', { ascending: false }),
-        supabase.from('promo_codes').select('*').order('created_at', { ascending: false })
+        supabase.from('promo_codes').select('*').order('created_at', { ascending: false }),
+        supabase.from('profiles').select('*')
       ]);
       
       if (linksRes.data) {
@@ -124,6 +126,7 @@ export default function Dashboard() {
       }
       if (payRes.data) setPayments(payRes.data);
       if (promoRes.data) setPromos(promoRes.data);
+      if (profRes.data) setCustomers(profRes.data);
     } catch (e) {
       console.error("Fetch error:", e);
     }
@@ -154,6 +157,13 @@ export default function Dashboard() {
   const handleDeletePromo = async (id) => {
     if(!window.confirm('Ushbu promokodni o\'chirasizmi?')) return;
     await supabase.from('promo_codes').delete().eq('id', id);
+    fetchAllData();
+  };
+
+  const handleTogglePremium = async (customer) => {
+    const willBePremium = !customer.is_premium;
+    if(!window.confirm(`Mijozni ${willBePremium ? 'Premium (Bepul)' : 'Oddiy'} tarifiga o'tkazasizmi?`)) return;
+    await supabase.from('profiles').update({ is_premium: willBePremium }).eq('id', customer.id);
     fetchAllData();
   };
 
@@ -419,8 +429,8 @@ export default function Dashboard() {
       </nav>
 
       {/* ADMIN TABS */}
-      <div style={{ background: '#111', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-        <div style={{ maxWidth: '1400px', margin: '0 auto', padding: '0 2rem', display: 'flex', gap: '2rem' }}>
+      <div style={{ background: '#111', borderBottom: '1px solid rgba(255,255,255,0.05)', overflowX: 'auto' }}>
+        <div style={{ maxWidth: '1400px', margin: '0 auto', padding: '0 2rem', display: 'flex', gap: '2rem', whiteSpace: 'nowrap' }}>
           <button onClick={() => setAdminTab('inventory')} style={{ padding: '1.2rem 0', background: 'none', border: 'none', borderBottom: adminTab === 'inventory' ? '2px solid #d4af37' : '2px solid transparent', color: adminTab === 'inventory' ? '#d4af37' : '#888', fontWeight: 700, fontSize: '1.1rem', cursor: 'pointer', transition: '0.3s' }}>
             📦 QR Baza
           </button>
@@ -430,6 +440,9 @@ export default function Dashboard() {
           </button>
           <button onClick={() => setAdminTab('promos')} style={{ padding: '1.2rem 0', background: 'none', border: 'none', borderBottom: adminTab === 'promos' ? '2px solid #d4af37' : '2px solid transparent', color: adminTab === 'promos' ? '#d4af37' : '#888', fontWeight: 700, fontSize: '1.1rem', cursor: 'pointer', transition: '0.3s' }}>
             🎁 Promokodlar
+          </button>
+          <button onClick={() => setAdminTab('customers')} style={{ padding: '1.2rem 0', background: 'none', border: 'none', borderBottom: adminTab === 'customers' ? '2px solid #d4af37' : '2px solid transparent', color: adminTab === 'customers' ? '#d4af37' : '#888', fontWeight: 700, fontSize: '1.1rem', cursor: 'pointer', transition: '0.3s' }}>
+            👥 Mijozlar
           </button>
         </div>
       </div>
@@ -641,13 +654,13 @@ export default function Dashboard() {
               </button>
             </div>
             
-            <div style={{ background: 'rgba(255,255,255,0.02)', borderRadius: '24px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.05)' }}>
-              <table style={{ width: '100%', textAlign: 'left', borderCollapse: 'collapse' }}>
+            <div style={{ background: 'rgba(255,255,255,0.02)', borderRadius: '24px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.05)', overflowX: 'auto' }}>
+              <table style={{ width: '100%', textAlign: 'left', borderCollapse: 'collapse', minWidth: '600px' }}>
                 <thead>
                   <tr style={{ background: 'rgba(255,255,255,0.05)' }}>
                     <th style={{ padding: '1.2rem', color: '#888' }}>Kod</th>
                     <th style={{ padding: '1.2rem', color: '#888' }}>Holati</th>
-                    <th style={{ padding: '1.2rem', color: '#888' }}>Ishlatilgan</th>
+                    <th style={{ padding: '1.2rem', color: '#888' }}>Yaratilgan</th>
                     <th style={{ padding: '1.2rem', color: '#888', width: '100px' }}>Amal</th>
                   </tr>
                 </thead>
@@ -665,6 +678,49 @@ export default function Dashboard() {
                       <td style={{ padding: '1.2rem', color: '#888', fontSize: '0.9rem' }}>{formatDate(promo.created_at)}</td>
                       <td style={{ padding: '1.2rem' }}>
                         <button onClick={() => handleDeletePromo(promo.id)} style={{ padding: '0.5rem', background: 'rgba(239,68,68,0.1)', color: '#f87171', border: 'none', borderRadius: '8px', cursor: 'pointer' }}><Trash2 size={18} /></button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        )}
+
+        {/* CUSTOMERS TAB */}
+        {adminTab === 'customers' && (
+          <section>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
+              <h2 style={{ fontSize: '2rem', fontWeight: 800 }}>Mijozlar Ro'yxati</h2>
+              <span style={{ background: 'rgba(255,255,255,0.05)', padding: '0.5rem 1rem', borderRadius: '12px', color: '#888' }}>Jami: {customers.length}</span>
+            </div>
+
+            <div style={{ background: 'rgba(255,255,255,0.02)', borderRadius: '24px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.05)', overflowX: 'auto' }}>
+              <table style={{ width: '100%', textAlign: 'left', borderCollapse: 'collapse', minWidth: '700px' }}>
+                <thead>
+                  <tr style={{ background: 'rgba(255,255,255,0.05)' }}>
+                    <th style={{ padding: '1.2rem', color: '#888' }}>Juftlik (Ismlar)</th>
+                    <th style={{ padding: '1.2rem', color: '#888' }}>Sana</th>
+                    <th style={{ padding: '1.2rem', color: '#888' }}>Tarif Holati</th>
+                    <th style={{ padding: '1.2rem', color: '#888', textAlign: 'right' }}>Amal</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {customers.length === 0 ? (
+                    <tr><td colSpan="4" style={{ padding: '2rem', textAlign: 'center', color: '#888' }}>Mijozlar mavjud emas</td></tr>
+                  ) : customers.map(cust => (
+                    <tr key={cust.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                      <td style={{ padding: '1.2rem', fontWeight: 'bold' }}>{cust.couple_names || 'Kiritilmagan'}</td>
+                      <td style={{ padding: '1.2rem', color: '#888', fontSize: '0.9rem' }}>{cust.est_date || '-'}</td>
+                      <td style={{ padding: '1.2rem' }}>
+                        <span style={{ padding: '0.3rem 0.8rem', borderRadius: '8px', fontSize: '0.8rem', background: cust.is_premium ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)', color: cust.is_premium ? '#4ade80' : '#ef4444' }}>
+                          {cust.is_premium ? 'Premium' : 'Oddiy (To\'lamagan)'}
+                        </span>
+                      </td>
+                      <td style={{ padding: '1.2rem', textAlign: 'right' }}>
+                        <button onClick={() => handleTogglePremium(cust)} style={{ padding: '0.6rem 1rem', background: cust.is_premium ? 'rgba(255,255,255,0.05)' : 'linear-gradient(to right, #d4af37, #aa8022)', color: cust.is_premium ? '#fff' : '#000', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}>
+                          {cust.is_premium ? 'Premium olib tashlash' : 'Bepul Premium berish'}
+                        </button>
                       </td>
                     </tr>
                   ))}
