@@ -15,12 +15,18 @@ export default function Dashboard() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [memories, setMemories] = useState([]);
   const [coupons, setCoupons] = useState([]);
-  const [profile, setProfile] = useState({ couple_names: '', est_date: '', spotify_url: '', theme: 'dark', is_premium: false, voice_memo_url: '' });
+  const [profile, setProfile] = useState({ couple_names: '', est_date: '', spotify_url: '', theme: 'dark', is_premium: false, voice_memo_url: '', subscription_expires_at: null });
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState(null);
   const [showInstallModal, setShowInstallModal] = useState(false);
+  const [promoCode, setPromoCode] = useState('');
+  const [promoError, setPromoError] = useState('');
+  const [receiptFile, setReceiptFile] = useState(null);
+  const [paymentPlan, setPaymentPlan] = useState('monthly');
+  const [submittingPayment, setSubmittingPayment] = useState(false);
+  const [paymentPending, setPaymentPending] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -79,11 +85,24 @@ export default function Dashboard() {
 
     // Fetch Profile
     const { data: profileData } = await supabase.from('profiles').select('*').eq('id', user.id).single();
-    if (profileData) setProfile({
-      ...profileData, 
-      theme: profileData.theme || 'dark',
-      is_premium: profileData.is_premium || false
-    });
+    if (profileData) {
+      const isPrem = profileData.is_premium || false;
+      setProfile({
+        ...profileData, 
+        theme: profileData.theme || 'dark',
+        is_premium: isPrem,
+        subscription_expires_at: profileData.subscription_expires_at
+      });
+      if (!isPrem) {
+        setActiveTab('premium');
+      }
+    }
+
+    // Check if there is a pending payment
+    const { data: pendingReq } = await supabase.from('payment_requests').select('*').eq('user_id', user.id).eq('status', 'pending').single();
+    if (pendingReq) {
+      setPaymentPending(true);
+    }
 
     // Fetch Memories
     const { data: memData } = await supabase.from('memories').select('*').eq('user_id', user.id).order('created_at', { ascending: false });
@@ -198,19 +217,87 @@ export default function Dashboard() {
     fetchData();
   };
 
+  const handleApplyPromoCode = async () => {
+    setPromoError('');
+    if(!promoCode) return;
+    setSubmittingPayment(true);
+    
+    // Check if promo code exists and not used
+    const { data: promo } = await supabase.from('promo_codes').select('*').eq('code', promoCode).eq('is_used', false).single();
+    
+    if (promo) {
+      // Apply promo
+      await supabase.from('profiles').update({ is_premium: true }).eq('id', user.id);
+      await supabase.from('promo_codes').update({ is_used: true, used_by: user.id }).eq('id', promo.id);
+      alert("Promokod muvaffaqiyatli qo'llanildi! Premium faollashdi.");
+      window.location.reload();
+    } else {
+      setPromoError("Promokod xato yoki ishlatib bo'lingan.");
+    }
+    setSubmittingPayment(false);
+  };
+
+  const handleSubmitPayment = async () => {
+    if(!receiptFile) return alert("Iltimos, avval to'lov chekini (skrinshot) yuklang!");
+    setSubmittingPayment(true);
+
+    const fileExt = receiptFile.name.split('.').pop();
+    const fileName = `receipt_${Date.now()}.${fileExt}`;
+    const filePath = `receipts/${user.id}/${fileName}`;
+
+    const { error: uploadError } = await supabase.storage.from('memories_bucket').upload(filePath, receiptFile);
+    
+    if (uploadError) {
+      alert("Rasm yuklashda xatolik yuz berdi.");
+      setSubmittingPayment(false);
+      return;
+    }
+
+    const { data } = supabase.storage.from('memories_bucket').getPublicUrl(filePath);
+
+    // Save request
+    await supabase.from('payment_requests').insert([{
+      user_id: user.id,
+      user_email: user.email,
+      plan_type: paymentPlan,
+      receipt_url: data.publicUrl
+    }]);
+
+    // Send Telegram Notification
+    const BOT_TOKEN = '8946477442:AAHZAuZKTyPq-tzYHUkH55B8s5ZgG6TGD30';
+    const CHAT_ID = '2141366575';
+    const text = `💰 Yangi to'lov so'rovi tushdi!\n\nMijoz: ${user.email}\nTarif: ${paymentPlan === 'monthly' ? '1 Oylik' : '1 Yillik'}\n\nAdmin panelga kirib tekshiring va tasdiqlang!`;
+    
+    try {
+      await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chat_id: CHAT_ID, text: text })
+      });
+    } catch(err) {
+      console.log("Telegram botga xabar ketmadi:", err);
+    }
+
+    setPaymentPending(true);
+    setSubmittingPayment(false);
+    alert("Chek yuborildi! Admin tez orada tasdiqlaydi.");
+  };
+
   if (loading) return <div className="min-h-screen bg-[#14080b] flex items-center justify-center"><Loader2 className="animate-spin text-[#e2b19e]" size={40}/></div>;
 
   if (isAdmin) {
     return <AdminDashboard />;
   }
 
+  const isPremium = profile.is_premium;
+
   const menuItems = [
-    { id: 'overview', icon: <LayoutDashboard size={22} strokeWidth={1.5} />, label: 'Asosiy' },
-    { id: 'memories', icon: <ImageIcon size={22} strokeWidth={1.5} />, label: 'Xotiralar' },
-    { id: 'coupons', icon: <Gift size={22} strokeWidth={1.5} />, label: 'Kuponlar' },
-    { id: 'themes', icon: <Palette size={22} strokeWidth={1.5} />, label: 'Dizayn' },
-    { id: 'settings', icon: <Settings size={22} strokeWidth={1.5} />, label: 'Sozlamalar' },
-    { id: 'premium', icon: <CreditCard size={22} strokeWidth={1.5} />, label: 'Premium' },
+    { id: 'overview', icon: <LayoutDashboard size={22} strokeWidth={1.5} />, label: 'Asosiy', locked: !isPremium },
+    { id: 'memories', icon: <ImageIcon size={22} strokeWidth={1.5} />, label: 'Xotiralar', locked: !isPremium },
+    { id: 'coupons', icon: <Gift size={22} strokeWidth={1.5} />, label: 'Kuponlar', locked: !isPremium },
+    { id: 'themes', icon: <Palette size={22} strokeWidth={1.5} />, label: 'Dizayn', locked: !isPremium },
+    { id: 'settings', icon: <Settings size={22} strokeWidth={1.5} />, label: 'Sozlamalar', locked: !isPremium },
+    { id: 'premium', icon: <CreditCard size={22} strokeWidth={1.5} />, label: 'To\'lov', locked: false },
   ];
 
   return (
@@ -284,7 +371,9 @@ export default function Dashboard() {
         </div>
 
         <div className="flex-1 px-4 space-y-2 overflow-y-auto pt-8 md:pt-4">
-          {menuItems.map(item => (
+          {menuItems.map(item => {
+            if (item.locked) return null; // Hide locked items entirely from sidebar
+            return (
             <button
               key={item.id}
               onClick={() => { setActiveTab(item.id); setIsMobileMenuOpen(false); }}
@@ -297,10 +386,10 @@ export default function Dashboard() {
               <span className={`${activeTab === item.id ? 'text-[#e2b19e]' : ''}`}>{item.icon}</span>
               <span className="font-medium text-[15px] tracking-wide">{item.label}</span>
               {item.id === 'premium' && !profile.is_premium && (
-                <span className="ml-auto bg-gradient-to-r from-[#d4af37] to-[#aa8022] text-black text-[10px] font-bold px-2.5 py-1 rounded-full uppercase tracking-wider shadow-lg">Pro</span>
+                <span className="ml-auto bg-gradient-to-r from-[#d4af37] to-[#aa8022] text-black text-[10px] font-bold px-2.5 py-1 rounded-full uppercase tracking-wider shadow-lg">To'lov</span>
               )}
             </button>
-          ))}
+          )})}
         </div>
 
         <div className="p-6">
@@ -627,46 +716,96 @@ export default function Dashboard() {
             </div>
           )}
 
-          {/* PREMIUM TAB */}
+          {/* PAYWALL / PREMIUM TAB */}
           {activeTab === 'premium' && (
-            <div className="space-y-8 max-w-4xl mx-auto text-center py-12 md:py-20">
+            <div className="space-y-8 max-w-3xl mx-auto text-center py-12 md:py-20">
               <div className="inline-flex items-center justify-center w-24 h-24 rounded-full bg-gradient-to-br from-[#d4af37] to-[#aa8022] mb-8 shadow-[0_0_60px_rgba(212,175,55,0.4)] relative">
                 <div className="absolute inset-0 rounded-full border-4 border-white/20"></div>
                 <CreditCard size={40} className="text-[#1a0b11]" />
               </div>
-              <h1 className="text-5xl md:text-6xl font-serif text-white mb-6 tracking-tight">Romantika <span className="text-[#d4af37]">Pro</span></h1>
+              <h1 className="text-5xl md:text-6xl font-serif text-white mb-4 tracking-tight">To'lov <span className="text-[#d4af37]">Sahifasi</span></h1>
               <p className="text-gray-400 text-xl font-light mb-12 max-w-2xl mx-auto leading-relaxed">
-                Albomni barcha cheklovlardan ozod qiling. O'z yaqiningizga eng kuchli hissiyotlarni uzoq yillarga sovg'a qiling!
+                Albomni faollashtirish va barcha xizmatlardan cheksiz foydalanish uchun to'lovni amalga oshiring.
               </p>
 
-              <div className="bg-white/5 backdrop-blur-3xl border border-[#d4af37]/30 rounded-[40px] p-10 md:p-14 max-w-lg mx-auto text-left relative overflow-hidden shadow-2xl">
-                <div className="absolute top-0 right-0 w-64 h-64 bg-[#d4af37]/10 blur-[100px] rounded-full pointer-events-none"></div>
-                
-                <p className="text-5xl font-light text-[#d4af37] mb-8 tracking-tight">79,000 <span className="text-xl text-gray-400 font-sans tracking-normal">so'm/oy</span></p>
+              {paymentPending ? (
+                 <div className="bg-[#111] border border-green-500/30 p-10 rounded-[32px] shadow-2xl relative overflow-hidden">
+                   <div className="w-20 h-20 bg-green-500/20 text-green-400 rounded-full flex items-center justify-center mx-auto mb-6">
+                     <Loader2 size={32} className="animate-spin" />
+                   </div>
+                   <h2 className="text-2xl font-serif text-white mb-2">To'lovingiz tekshirilmoqda...</h2>
+                   <p className="text-gray-400 font-light max-w-md mx-auto">Siz yuborgan chek adminlarimiz tomonidan tasdiqlanishi kutilmoqda. Tasdiqlanishi bilan profilingiz avtomat ochiladi (10-15 daqiqa).</p>
+                 </div>
+              ) : profile.is_premium ? (
+                 <div className="bg-[#111] border border-green-500/30 p-10 rounded-[32px] shadow-2xl relative overflow-hidden">
+                   <div className="w-20 h-20 bg-green-500/20 text-green-400 rounded-full flex items-center justify-center mx-auto mb-6">
+                     <Heart size={32} className="fill-current" />
+                   </div>
+                   <h2 className="text-2xl font-serif text-white mb-2">Tabriklaymiz!</h2>
+                   <p className="text-gray-400 font-light max-w-md mx-auto">Sizning albomingiz to'liq faol! Barcha bo'limlardan erkin foydalanishingiz mumkin.</p>
+                 </div>
+              ) : (
+                <div className="bg-[#111]/80 backdrop-blur-3xl border border-white/10 rounded-[40px] p-8 md:p-14 max-w-xl mx-auto text-left relative overflow-hidden shadow-2xl">
+                  
+                  {/* Promo Code Section */}
+                  <div className="mb-10 p-6 bg-white/5 border border-white/10 rounded-2xl flex flex-col gap-3">
+                    <label className="text-sm text-gray-400 font-medium tracking-wide uppercase">Sizda Promokod bormi?</label>
+                    <div className="flex gap-3">
+                      <input 
+                        type="text" 
+                        value={promoCode}
+                        onChange={e => setPromoCode(e.target.value)}
+                        placeholder="Maxsus kodni kiriting..." 
+                        className="flex-1 bg-black/50 border border-white/10 rounded-xl px-4 text-white focus:outline-none focus:border-[#d4af37]"
+                      />
+                      <button onClick={handleApplyPromoCode} disabled={submittingPayment} className="px-6 py-3 bg-white/10 hover:bg-white/20 rounded-xl text-white font-medium transition-colors">
+                        Qo'llash
+                      </button>
+                    </div>
+                    {promoError && <p className="text-red-400 text-sm mt-1">{promoError}</p>}
+                  </div>
 
-                <ul className="space-y-6 mb-12 relative z-10">
-                  {[
-                    'Cheksiz rasmlar yuklash', 
-                    'Fonda o\'ynaydigan Ovozli Xabarlar (Kutilmoqda)', 
-                    'Premium dizayn shablonlari (Luxury Gold)', 
-                    'Kuponlar uchun interaktiv viktorinalar'
-                  ].map((feature, idx) => (
-                    <li key={idx} className="flex items-center gap-4">
-                      <div className="w-8 h-8 rounded-full bg-[#d4af37]/20 flex items-center justify-center shrink-0">
-                        <div className="w-2.5 h-2.5 bg-[#d4af37] rounded-full"></div>
+                  <div className="w-full h-px bg-gradient-to-r from-transparent via-white/20 to-transparent mb-10"></div>
+
+                  <h3 className="text-2xl font-serif text-white mb-6">Tarifni tanlang:</h3>
+                  <div className="grid grid-cols-2 gap-4 mb-10">
+                    <div onClick={() => setPaymentPlan('monthly')} className={`cursor-pointer border-2 rounded-2xl p-6 text-center transition-all ${paymentPlan === 'monthly' ? 'border-[#d4af37] bg-[#d4af37]/10' : 'border-white/10 bg-black/30 hover:bg-white/5'}`}>
+                      <h4 className="text-white font-medium mb-1">1 Oylik</h4>
+                      <p className="text-2xl font-serif text-[#d4af37]">29,000 <span className="text-xs text-gray-500">so'm</span></p>
+                    </div>
+                    <div onClick={() => setPaymentPlan('yearly')} className={`cursor-pointer border-2 rounded-2xl p-6 text-center transition-all relative ${paymentPlan === 'yearly' ? 'border-[#d4af37] bg-[#d4af37]/10' : 'border-white/10 bg-black/30 hover:bg-white/5'}`}>
+                      <div className="absolute -top-3 -right-3 bg-red-500 text-white text-[10px] font-bold px-2 py-1 rounded-full shadow-lg">FOYDALI</div>
+                      <h4 className="text-white font-medium mb-1">1 Yillik</h4>
+                      <p className="text-2xl font-serif text-[#d4af37]">198,000 <span className="text-xs text-gray-500">so'm</span></p>
+                    </div>
+                  </div>
+
+                  <div className="bg-[#d4af37]/10 border border-[#d4af37]/30 rounded-2xl p-6 mb-8 text-center">
+                    <p className="text-gray-300 text-sm mb-2">Quyidagi karta raqamiga pul o'tkazing:</p>
+                    <p className="text-3xl font-mono text-white tracking-widest mb-1 select-all">5614 6818 5423 5698</p>
+                    <p className="text-[#d4af37] font-medium text-lg uppercase tracking-widest">Имомкулов мироншох</p>
+                  </div>
+
+                  <div className="mb-8">
+                    <label className="block text-sm font-medium text-gray-400 mb-3 uppercase tracking-widest text-center">To'lov chekini yuklang (Skrinshot)</label>
+                    <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-white/20 rounded-2xl cursor-pointer hover:border-[#d4af37]/50 hover:bg-white/5 transition-colors">
+                      <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                        <ImageIcon size={28} className="text-gray-400 mb-2" />
+                        <p className="text-sm text-gray-400">{receiptFile ? receiptFile.name : 'Rasm yuklash uchun bosing'}</p>
                       </div>
-                      <span className="text-gray-200 text-lg font-light leading-snug">{feature}</span>
-                    </li>
-                  ))}
-                </ul>
+                      <input type="file" accept="image/*" onChange={e => setReceiptFile(e.target.files[0])} className="hidden" />
+                    </label>
+                  </div>
 
-                <button 
-                  onClick={() => alert('To\'lov tizimi tez kunda ulanadi!')}
-                  className="w-full py-5 bg-gradient-to-r from-[#d4af37] to-[#aa8022] hover:from-[#f0c950] hover:to-[#c69a30] text-[#1a0b11] rounded-2xl font-bold text-lg shadow-[0_10px_40px_rgba(212,175,55,0.4)] transition-all duration-300 transform hover:-translate-y-1 relative z-10"
-                >
-                  Premiumga O'tish
-                </button>
-              </div>
+                  <button 
+                    onClick={handleSubmitPayment}
+                    disabled={submittingPayment || !receiptFile}
+                    className="w-full py-5 bg-gradient-to-r from-[#d4af37] to-[#aa8022] hover:from-[#f0c950] hover:to-[#c69a30] text-[#1a0b11] rounded-2xl font-bold text-lg shadow-[0_10px_40px_rgba(212,175,55,0.4)] transition-all duration-300 transform hover:-translate-y-1 relative z-10 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {submittingPayment ? <Loader2 size={24} className="animate-spin mx-auto" /> : 'To\'lovni Tasdiqlashga Yuborish'}
+                  </button>
+                </div>
+              )}
             </div>
           )}
 

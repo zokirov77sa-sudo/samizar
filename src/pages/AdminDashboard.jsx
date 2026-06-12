@@ -84,6 +84,10 @@ export default function Dashboard() {
   const [bulkPrintData, setBulkPrintData] = useState(null); 
   const [isGeneratingUzum, setIsGeneratingUzum] = useState(false);
 
+  const [adminTab, setAdminTab] = useState('inventory');
+  const [payments, setPayments] = useState([]);
+  const [promos, setPromos] = useState([]);
+
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -97,28 +101,61 @@ export default function Dashboard() {
     return () => subscription.unsubscribe();
   }, [navigate]);
 
-  const fetchLinks = async () => {
+  const fetchAllData = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase.from('qr_links').select('*');
-      if (error) throw error;
-      const mappedData = (data || []).map(item => ({
-        ...item,
-        productCode: item.productcode || item.productCode,
-        createdAt: item.createdat || item.createdAt,
-        updatedAt: item.updatedat || item.updatedAt,
-        soldAt: item.soldat || item.soldAt,
-        customerEmail: item.customeremail || item.customerEmail,
-        customerLink: item.customerlink || item.customerLink
-      }));
-      setLinks(mappedData);
+      const [linksRes, payRes, promoRes] = await Promise.all([
+        supabase.from('qr_links').select('*'),
+        supabase.from('payment_requests').select('*').order('created_at', { ascending: false }),
+        supabase.from('promo_codes').select('*').order('created_at', { ascending: false })
+      ]);
+      
+      if (linksRes.data) {
+        const mappedData = linksRes.data.map(item => ({
+          ...item,
+          productCode: item.productcode || item.productCode,
+          createdAt: item.createdat || item.createdAt,
+          updatedAt: item.updatedat || item.updatedAt,
+          soldAt: item.soldat || item.soldAt,
+          customerEmail: item.customeremail || item.customerEmail,
+          customerLink: item.customerlink || item.customerLink
+        }));
+        setLinks(mappedData);
+      }
+      if (payRes.data) setPayments(payRes.data);
+      if (promoRes.data) setPromos(promoRes.data);
     } catch (e) {
       console.error("Fetch error:", e);
-      alert("Ma'lumotlarni yuklashda xatolik yuz berdi. Iltimos, internetni tekshiring.");
     }
     setLoading(false);
   };
-  useEffect(() => { fetchLinks(); }, []);
+  useEffect(() => { fetchAllData(); }, []);
+
+  const handleApprovePayment = async (pay) => {
+    if(!window.confirm('Haqiqatdan ham pul tushganini tasdiqlaysizmi? Mijozning albomi faollashadi!')) return;
+    await supabase.from('payment_requests').update({ status: 'approved' }).eq('id', pay.id);
+    await supabase.from('profiles').update({ is_premium: true }).eq('id', pay.user_id);
+    fetchAllData();
+  };
+
+  const handleRejectPayment = async (id) => {
+    if(!window.confirm('To\'lovni rad etasizmi?')) return;
+    await supabase.from('payment_requests').update({ status: 'rejected' }).eq('id', id);
+    fetchAllData();
+  };
+
+  const handleCreatePromo = async () => {
+    const code = window.prompt("Yangi Promokod yozing (Masalan: BEPUL2026):");
+    if(!code) return;
+    await supabase.from('promo_codes').insert([{ code: code.toUpperCase(), plan_type: 'monthly' }]);
+    fetchAllData();
+  };
+
+  const handleDeletePromo = async (id) => {
+    if(!window.confirm('Ushbu promokodni o\'chirasizmi?')) return;
+    await supabase.from('promo_codes').delete().eq('id', id);
+    fetchAllData();
+  };
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -169,7 +206,7 @@ export default function Dashboard() {
         soldat: newStatus === 'sold' ? new Date().toISOString() : null,
         customeremail: newStatus === 'sold' ? (link.customerEmail || 'admin-manual@bmc.uz') : null
       }).eq('id', link.id);
-      await fetchLinks();
+      await fetchAllData();
     } catch (e) { alert("Xatolik yuz berdi"); }
     setTogglingId(null);
   };
@@ -178,7 +215,7 @@ export default function Dashboard() {
     if (!window.confirm("O'chirib tashlaysizmi?")) return;
     try {
       await supabase.from('qr_links').delete().eq('id', id);
-      await fetchLinks();
+      await fetchAllData();
     } catch (e) { alert("O'chirishda xatolik"); }
   };
 
@@ -206,7 +243,7 @@ export default function Dashboard() {
         });
       }
       setIsModalOpen(false);
-      await fetchLinks();
+      await fetchAllData();
     } catch (e) { alert("Saqlashda xatolik"); }
     setSavingFile(false);
   };
@@ -235,7 +272,7 @@ export default function Dashboard() {
           createdat: new Date().toISOString()
         });
       }
-      await fetchLinks();
+      await fetchAllData();
       setIsModalOpen(false);
       
       // Trigger Print
@@ -279,7 +316,7 @@ export default function Dashboard() {
           newItems.push(item);
         }
       }
-      await fetchLinks();
+      await fetchAllData();
       setIsBulkModalOpen(false);
       if (newItems.length > 0) {
         alert(`${newItems.length} ta QR kod bazaga muvaffaqiyatli qo'shildi! Endi ularni chop etishingiz mumkin.`);
@@ -381,8 +418,26 @@ export default function Dashboard() {
         </div>
       </nav>
 
+      {/* ADMIN TABS */}
+      <div style={{ background: '#111', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+        <div style={{ maxWidth: '1400px', margin: '0 auto', padding: '0 2rem', display: 'flex', gap: '2rem' }}>
+          <button onClick={() => setAdminTab('inventory')} style={{ padding: '1.2rem 0', background: 'none', border: 'none', borderBottom: adminTab === 'inventory' ? '2px solid #d4af37' : '2px solid transparent', color: adminTab === 'inventory' ? '#d4af37' : '#888', fontWeight: 700, fontSize: '1.1rem', cursor: 'pointer', transition: '0.3s' }}>
+            📦 QR Baza
+          </button>
+          <button onClick={() => setAdminTab('payments')} style={{ padding: '1.2rem 0', background: 'none', border: 'none', borderBottom: adminTab === 'payments' ? '2px solid #d4af37' : '2px solid transparent', color: adminTab === 'payments' ? '#d4af37' : '#888', fontWeight: 700, fontSize: '1.1rem', cursor: 'pointer', transition: '0.3s', position: 'relative' }}>
+            💰 To'lovlar 
+            {payments.filter(p => p.status === 'pending').length > 0 && <span style={{ background: '#ef4444', color: '#fff', fontSize: '0.7rem', padding: '0.2rem 0.5rem', borderRadius: '99px', marginLeft: '0.5rem', position: 'absolute', top: '0.8rem' }}>{payments.filter(p => p.status === 'pending').length}</span>}
+          </button>
+          <button onClick={() => setAdminTab('promos')} style={{ padding: '1.2rem 0', background: 'none', border: 'none', borderBottom: adminTab === 'promos' ? '2px solid #d4af37' : '2px solid transparent', color: adminTab === 'promos' ? '#d4af37' : '#888', fontWeight: 700, fontSize: '1.1rem', cursor: 'pointer', transition: '0.3s' }}>
+            🎁 Promokodlar
+          </button>
+        </div>
+      </div>
+
       <div style={{ maxWidth: '1400px', margin: '0 auto', padding: '2rem' }}>
-        <header style={{ marginBottom: '3rem' }}>
+        {adminTab === 'inventory' && (
+          <>
+            <header style={{ marginBottom: '3rem' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '2rem' }}>
             <div>
               <h1 style={{ fontSize: '2.4rem', fontWeight: 800, marginBottom: '0.5rem' }}>Dashboard</h1>
@@ -541,6 +596,83 @@ export default function Dashboard() {
             })}
           </div>
         </section>
+        </>
+        )}
+
+        {/* PAYMENTS TAB */}
+        {adminTab === 'payments' && (
+          <section>
+            <h2 style={{ fontSize: '2rem', fontWeight: 800, marginBottom: '2rem' }}>To'lov So'rovlari</h2>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))', gap: '1.5rem' }}>
+              {payments.length === 0 ? <p style={{ color: '#888' }}>Hech qanday to'lov so'rovi yo'q.</p> : payments.map(pay => (
+                <div key={pay.id} style={{ background: 'rgba(255,255,255,0.03)', borderRadius: '24px', padding: '1.5rem', border: '1px solid rgba(255,255,255,0.05)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem' }}>
+                    <span style={{ fontSize: '0.8rem', color: '#888' }}>{formatDate(pay.created_at)}</span>
+                    <span style={{ padding: '0.3rem 0.8rem', borderRadius: '8px', fontSize: '0.8rem', fontWeight: 'bold', textTransform: 'uppercase', background: pay.status === 'pending' ? 'rgba(234,179,8,0.1)' : pay.status === 'approved' ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)', color: pay.status === 'pending' ? '#eab308' : pay.status === 'approved' ? '#4ade80' : '#ef4444' }}>
+                      {pay.status === 'pending' ? 'Kutilmoqda' : pay.status === 'approved' ? 'Tasdiqlangan' : 'Rad etilgan'}
+                    </span>
+                  </div>
+                  <h3 style={{ fontSize: '1.1rem', marginBottom: '0.5rem' }}>{pay.user_email}</h3>
+                  <p style={{ color: '#d4af37', fontWeight: 'bold', marginBottom: '1rem' }}>Tarif: {pay.plan_type === 'monthly' ? '1 Oylik' : '1 Yillik'}</p>
+                  
+                  <a href={pay.receipt_url} target="_blank" rel="noreferrer" style={{ display: 'block', width: '100%', height: '200px', borderRadius: '12px', overflow: 'hidden', marginBottom: '1.5rem' }}>
+                    <img src={pay.receipt_url} alt="Chek" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  </a>
+
+                  {pay.status === 'pending' && (
+                    <div style={{ display: 'flex', gap: '1rem' }}>
+                      <button onClick={() => handleApprovePayment(pay)} style={{ flex: 1, padding: '0.8rem', background: '#22c55e', color: '#fff', border: 'none', borderRadius: '12px', fontWeight: 'bold', cursor: 'pointer' }}>Tasdiqlash</button>
+                      <button onClick={() => handleRejectPayment(pay.id)} style={{ flex: 1, padding: '0.8rem', background: 'rgba(239,68,68,0.2)', color: '#f87171', border: 'none', borderRadius: '12px', fontWeight: 'bold', cursor: 'pointer' }}>Rad etish</button>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* PROMOS TAB */}
+        {adminTab === 'promos' && (
+          <section>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
+              <h2 style={{ fontSize: '2rem', fontWeight: 800 }}>Promokodlar</h2>
+              <button onClick={handleCreatePromo} className="btn-primary" style={{ padding: '0.8rem 1.5rem', borderRadius: '14px', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                <Plus size={20} /> Yangi Kod
+              </button>
+            </div>
+            
+            <div style={{ background: 'rgba(255,255,255,0.02)', borderRadius: '24px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.05)' }}>
+              <table style={{ width: '100%', textAlign: 'left', borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr style={{ background: 'rgba(255,255,255,0.05)' }}>
+                    <th style={{ padding: '1.2rem', color: '#888' }}>Kod</th>
+                    <th style={{ padding: '1.2rem', color: '#888' }}>Holati</th>
+                    <th style={{ padding: '1.2rem', color: '#888' }}>Ishlatilgan</th>
+                    <th style={{ padding: '1.2rem', color: '#888', width: '100px' }}>Amal</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {promos.length === 0 ? (
+                    <tr><td colSpan="4" style={{ padding: '2rem', textAlign: 'center', color: '#888' }}>Promokodlar yo'q</td></tr>
+                  ) : promos.map(promo => (
+                    <tr key={promo.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                      <td style={{ padding: '1.2rem', fontWeight: 'bold', fontSize: '1.2rem', letterSpacing: '1px' }}>{promo.code}</td>
+                      <td style={{ padding: '1.2rem' }}>
+                        <span style={{ padding: '0.3rem 0.8rem', borderRadius: '8px', fontSize: '0.8rem', background: promo.is_used ? 'rgba(239,68,68,0.1)' : 'rgba(34,197,94,0.1)', color: promo.is_used ? '#ef4444' : '#4ade80' }}>
+                          {promo.is_used ? 'Ishlatilgan' : 'Aktiv'}
+                        </span>
+                      </td>
+                      <td style={{ padding: '1.2rem', color: '#888', fontSize: '0.9rem' }}>{formatDate(promo.created_at)}</td>
+                      <td style={{ padding: '1.2rem' }}>
+                        <button onClick={() => handleDeletePromo(promo.id)} style={{ padding: '0.5rem', background: 'rgba(239,68,68,0.1)', color: '#f87171', border: 'none', borderRadius: '8px', cursor: 'pointer' }}><Trash2 size={18} /></button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        )}
       </div>
 
       {/* Modal: Yangi / Tahrirlash */}
