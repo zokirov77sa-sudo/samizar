@@ -256,27 +256,25 @@ export default function Dashboard() {
     const { data } = supabase.storage.from('memories_bucket').getPublicUrl(filePath);
 
     // Save request
-    const { data: requestData } = await supabase.from('payment_requests').insert([{
+    const reqId = crypto.randomUUID();
+    await supabase.from('payment_requests').insert([{
+      id: reqId,
       user_id: user.id,
       user_email: user.email,
       plan_type: paymentPlan,
       receipt_url: data.publicUrl
-    }]).select();
+    }]);
 
     // Send Telegram Notification
     const BOT_TOKEN = '8946477442:AAHZAuZKTyPq-tzYHUkH55B8s5ZgG6TGD30';
     const CHAT_ID = '2141366575';
     const text = `💰 Yangi to'lov so'rovi tushdi!\n\nMijoz: ${user.email}\nTarif: ${paymentPlan === 'monthly' ? '1 Oylik' : '1 Yillik'}`;
     
-    let reply_markup = undefined;
-    if (requestData && requestData.length > 0) {
-      const reqId = requestData[0].id;
-      reply_markup = {
-        inline_keyboard: [[
-          { text: "✅ Tasdiqlash", callback_data: `approve_${reqId}_${user.id}` }
-        ]]
-      };
-    }
+    let reply_markup = {
+      inline_keyboard: [[
+        { text: "✅ Tasdiqlash", callback_data: `approve_${reqId}_${user.id}` }
+      ]]
+    };
 
     try {
       await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
