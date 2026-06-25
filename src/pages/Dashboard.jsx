@@ -255,15 +255,29 @@ export default function Dashboard() {
 
     const { data } = supabase.storage.from('memories_bucket').getPublicUrl(filePath);
 
+    // Generate UUID safely
+    function uuidv4() {
+      return "10000000-1000-4000-8000-100000000000".replace(/[018]/g, c =>
+        (c ^ (Math.random() * 256 | 0) & 15 >> c / 4).toString(16)
+      );
+    }
+    let reqId;
+    try { reqId = crypto.randomUUID(); } catch(e) { reqId = uuidv4(); }
+
     // Save request
-    const reqId = crypto.randomUUID();
-    await supabase.from('payment_requests').insert([{
+    const { error: insertError } = await supabase.from('payment_requests').insert([{
       id: reqId,
       user_id: user.id,
       user_email: user.email,
       plan_type: paymentPlan,
       receipt_url: data.publicUrl
     }]);
+
+    if (insertError) {
+      alert("Xato: " + insertError.message);
+      setSubmittingPayment(false);
+      return;
+    }
 
     // Send Telegram Notification
     const BOT_TOKEN = '8946477442:AAHZAuZKTyPq-tzYHUkH55B8s5ZgG6TGD30';
@@ -272,7 +286,7 @@ export default function Dashboard() {
     
     let reply_markup = {
       inline_keyboard: [[
-        { text: "✅ Tasdiqlash", callback_data: `approve_${reqId}_${user.id}` }
+        { text: "✅ Tasdiqlash", callback_data: `approve_${reqId}` }
       ]]
     };
 
