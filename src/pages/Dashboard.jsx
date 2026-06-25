@@ -93,9 +93,7 @@ export default function Dashboard() {
         is_premium: isPrem,
         subscription_expires_at: profileData.subscription_expires_at
       });
-      if (!isPrem) {
-        setActiveTab('premium');
-      }
+      // Removed forced redirection to 'premium' tab
     }
 
     // Check if there is a pending payment
@@ -124,8 +122,8 @@ export default function Dashboard() {
     const files = e.target.files;
     if (!files || files.length === 0) return;
     
-    if (!profile.is_premium && memories.length + files.length > 3) {
-      alert("Tekin versiyada faqat 3 tagacha rasm yuklash mumkin. Cheksiz yuklash uchun Premium oling!");
+    if (!profile.is_premium && memories.length + files.length > 5) {
+      alert("Tekin versiyada faqat 5 tagacha rasm yuklash mumkin. Cheksiz yuklash uchun Premium oling!");
       setActiveTab('premium');
       return;
     }
@@ -318,11 +316,11 @@ export default function Dashboard() {
   const isPremium = profile.is_premium;
 
   const menuItems = [
-    { id: 'overview', icon: <LayoutDashboard size={22} strokeWidth={1.5} />, label: 'Asosiy', locked: !isPremium },
-    { id: 'memories', icon: <ImageIcon size={22} strokeWidth={1.5} />, label: 'Xotiralar', locked: !isPremium },
-    { id: 'coupons', icon: <Gift size={22} strokeWidth={1.5} />, label: 'Kuponlar', locked: !isPremium },
-    { id: 'themes', icon: <Palette size={22} strokeWidth={1.5} />, label: 'Dizayn', locked: !isPremium },
-    { id: 'settings', icon: <Settings size={22} strokeWidth={1.5} />, label: 'Sozlamalar', locked: !isPremium },
+    { id: 'overview', icon: <LayoutDashboard size={22} strokeWidth={1.5} />, label: 'Asosiy', locked: false },
+    { id: 'memories', icon: <ImageIcon size={22} strokeWidth={1.5} />, label: 'Xotiralar', locked: false },
+    { id: 'coupons', icon: <Gift size={22} strokeWidth={1.5} />, label: 'Kuponlar', locked: false },
+    { id: 'themes', icon: <Palette size={22} strokeWidth={1.5} />, label: 'Dizayn', locked: false },
+    { id: 'settings', icon: <Settings size={22} strokeWidth={1.5} />, label: 'Sozlamalar', locked: false },
     { id: 'premium', icon: <CreditCard size={22} strokeWidth={1.5} />, label: 'To\'lov', locked: false },
   ];
 
