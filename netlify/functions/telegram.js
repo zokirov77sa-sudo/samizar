@@ -21,13 +21,18 @@ exports.handler = async function(event, context) {
       if (data.startsWith('approve_')) {
         const parts = data.split('_');
         const reqId = parts[1];
-        const userId = parts[2];
 
-        // Update payment_requests status
-        await supabase.from('payment_requests').update({ status: 'approved' }).eq('id', reqId);
-        
-        // Update user profile to premium
-        await supabase.from('profiles').update({ is_premium: true }).eq('id', userId);
+        // Fetch user_id from payment_requests
+        const { data: reqs } = await supabase.from('payment_requests').select('user_id').eq('id', reqId);
+        if (reqs && reqs.length > 0) {
+          const userId = reqs[0].user_id;
+          
+          // Update payment_requests status
+          await supabase.from('payment_requests').update({ status: 'approved' }).eq('id', reqId);
+          
+          // Update user profile to premium
+          await supabase.from('profiles').update({ is_premium: true }).eq('id', userId);
+        }
 
         // Edit the message in Telegram
         await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/editMessageText`, {
