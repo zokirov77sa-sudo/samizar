@@ -136,8 +136,20 @@ export default function Dashboard() {
 
   const handleApprovePayment = async (pay) => {
     if(!window.confirm('Haqiqatdan ham pul tushganini tasdiqlaysizmi? Mijozning albomi faollashadi!')) return;
-    await supabase.from('payment_requests').update({ status: 'approved' }).eq('id', pay.id);
-    await supabase.from('profiles').update({ is_premium: true }).eq('id', pay.user_id);
+    
+    const { error: reqError } = await supabase.from('payment_requests').update({ status: 'approved' }).eq('id', pay.id);
+    if (reqError) {
+      alert("Payment requests yangilashda xato: " + reqError.message);
+      return;
+    }
+
+    const { error: profError } = await supabase.from('profiles').update({ is_premium: true }).eq('id', pay.user_id);
+    if (profError) {
+      alert("Profiles jadvalini yangilashda xato: " + profError.message);
+      return;
+    }
+
+    alert("Muvaffaqiyatli tasdiqlandi va Premium faollashdi!");
     fetchAllData();
   };
 
@@ -163,7 +175,10 @@ export default function Dashboard() {
   const handleTogglePremium = async (customer) => {
     const willBePremium = !customer.is_premium;
     if(!window.confirm(`Mijozni ${willBePremium ? 'Premium (Bepul)' : 'Oddiy'} tarifiga o'tkazasizmi?`)) return;
-    await supabase.from('profiles').update({ is_premium: willBePremium }).eq('id', customer.id);
+    const { error } = await supabase.from('profiles').update({ is_premium: willBePremium }).eq('id', customer.id);
+    if (error) {
+      alert("Xatolik: " + error.message);
+    }
     fetchAllData();
   };
 
