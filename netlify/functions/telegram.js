@@ -30,8 +30,8 @@ exports.handler = async function(event, context) {
           // Update payment_requests status
           await supabase.from('payment_requests').update({ status: 'approved' }).eq('id', reqId);
           
-          // Update user profile to premium
-          await supabase.from('profiles').update({ is_premium: true }).eq('id', userId);
+          // Update user profile to premium (create if missing)
+          await supabase.from('profiles').upsert({ id: userId, is_premium: true });
         }
 
         // Edit the message in Telegram

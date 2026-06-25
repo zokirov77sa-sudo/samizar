@@ -143,7 +143,7 @@ export default function Dashboard() {
       return;
     }
 
-    const { error: profError } = await supabase.from('profiles').update({ is_premium: true }).eq('id', pay.user_id);
+    const { error: profError } = await supabase.from('profiles').upsert({ id: pay.user_id, is_premium: true });
     if (profError) {
       alert("Profiles jadvalini yangilashda xato: " + profError.message);
       return;
@@ -175,7 +175,7 @@ export default function Dashboard() {
   const handleTogglePremium = async (customer) => {
     const willBePremium = !customer.is_premium;
     if(!window.confirm(`Mijozni ${willBePremium ? 'Premium (Bepul)' : 'Oddiy'} tarifiga o'tkazasizmi?`)) return;
-    const { error } = await supabase.from('profiles').update({ is_premium: willBePremium }).eq('id', customer.id);
+    const { error } = await supabase.from('profiles').upsert({ id: customer.id, is_premium: willBePremium });
     if (error) {
       alert("Xatolik: " + error.message);
     }
