@@ -14,6 +14,7 @@ export default function Dashboard() {
   const [user, setUser] = useState(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [memories, setMemories] = useState([]);
+  const [stories, setStories] = useState([]);
   const [coupons, setCoupons] = useState([]);
   const [profile, setProfile] = useState({ couple_names: '', est_date: '', spotify_url: '', theme: 'dark', is_premium: false, voice_memo_url: '', subscription_expires_at: null });
   const [loading, setLoading] = useState(true);
@@ -110,6 +111,10 @@ export default function Dashboard() {
     const { data: coupData } = await supabase.from('coupons').select('*').eq('user_id', user.id).order('created_at', { ascending: false });
     if (coupData) setCoupons(coupData);
 
+    // Fetch Stories
+    const { data: storyData } = await supabase.from('stories').select('*').eq('user_id', user.id).order('order_index', { ascending: true });
+    if (storyData) setStories(storyData);
+
     setLoading(false);
   };
 
@@ -150,6 +155,42 @@ export default function Dashboard() {
   const handleDeleteMemory = async (id) => {
     if(confirm('Rasmni o`chirishga ishonchingiz komilmi?')) {
       await supabase.from('memories').delete().eq('id', id);
+      fetchData();
+    }
+  };
+
+  const handleStoryUpload = async (e) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    
+    if (!profile.is_premium) {
+      alert("Bu xususiyat faqat Premium tarifda ishlaydi!");
+      setActiveTab('premium');
+      return;
+    }
+
+    setUploading(true);
+    
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      const fileExt = file.name.split('.').pop();
+      const fileName = `story_${Math.random()}.${fileExt}`;
+      const filePath = `${user.id}/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage.from('memories_bucket').upload(filePath, file);
+      if (!uploadError) {
+        const { data } = supabase.storage.from('memories_bucket').getPublicUrl(filePath);
+        await supabase.from('stories').insert([{ user_id: user.id, image_url: data.publicUrl, order_index: stories.length + i + 1 }]);
+      }
+    }
+    
+    fetchData();
+    setUploading(false);
+  };
+
+  const handleDeleteStory = async (id) => {
+    if(confirm('Kadrni o`chirishga ishonchingiz komilmi?')) {
+      await supabase.from('stories').delete().eq('id', id);
       fetchData();
     }
   };
@@ -318,6 +359,7 @@ export default function Dashboard() {
   const menuItems = [
     { id: 'overview', icon: <LayoutDashboard size={22} strokeWidth={1.5} />, label: 'Asosiy', locked: false },
     { id: 'memories', icon: <ImageIcon size={22} strokeWidth={1.5} />, label: 'Xotiralar', locked: false },
+    { id: 'stories', icon: <Heart size={22} strokeWidth={1.5} />, label: 'Hikoyamiz', locked: false },
     { id: 'coupons', icon: <Gift size={22} strokeWidth={1.5} />, label: 'Kuponlar', locked: false },
     { id: 'themes', icon: <Palette size={22} strokeWidth={1.5} />, label: 'Dizayn', locked: false },
     { id: 'settings', icon: <Settings size={22} strokeWidth={1.5} />, label: 'Sozlamalar', locked: false },
@@ -590,6 +632,70 @@ export default function Dashboard() {
                   </div>
                 )}
               </div>
+            </div>
+          )}
+
+          {/* STORIES TAB */}
+          {activeTab === 'stories' && (
+            <div className="space-y-8">
+              <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-6 bg-white/5 backdrop-blur-2xl border border-white/10 p-8 rounded-[32px]">
+                <div>
+                  <h1 className="text-4xl font-serif text-white mb-2">Hikoyamiz</h1>
+                  <p className="text-gray-400 text-lg font-light">QR kod ochilganda chiqadigan kinematik animatsion hikoya kadrlarini tayyorlang.</p>
+                </div>
+                <label className="bg-gradient-to-r from-[#d4af37] to-[#aa8022] hover:from-[#e6c981] hover:to-[#d4af37] text-black px-8 py-4 rounded-2xl font-bold shadow-[0_10px_30px_rgba(212,175,55,0.3)] transition-all flex items-center justify-center gap-3 cursor-pointer shrink-0">
+                  {uploading ? <Loader2 size={20} className="animate-spin" /> : <Plus size={20} />}
+                  <span>{uploading ? 'Yuklanmoqda...' : 'Kadr Qo\'shish'}</span>
+                  <input type="file" accept="image/*" multiple className="hidden" onChange={handleStoryUpload} disabled={uploading} />
+                </label>
+              </header>
+
+              {!profile.is_premium && (
+                <div className="bg-[#d4af37]/10 border border-[#d4af37]/30 text-[#d4af37] p-8 rounded-[32px] text-center max-w-2xl mx-auto shadow-2xl">
+                  <Heart size={48} className="mx-auto mb-4 opacity-80" />
+                  <h2 className="text-2xl font-serif mb-2">Faqat Premium Uchun</h2>
+                  <p className="text-white/70 mb-6">Ushbu ajoyib funksiya QR kod ochilganda romantik hikoyangizni kino kabi namoyish etish imkonini beradi. Buni ishlatish uchun Premium tarifiga o'ting!</p>
+                  <button onClick={() => setActiveTab('premium')} className="bg-[#d4af37] text-black px-8 py-3 rounded-xl font-bold hover:bg-[#e6c981] transition-colors">
+                    Premium Olish
+                  </button>
+                </div>
+              )}
+
+              {profile.is_premium && (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {stories.map((story, index) => (
+                    <div key={story.id} className="bg-white/5 backdrop-blur-xl rounded-[24px] overflow-hidden group relative border border-white/10 hover:border-[#d4af37]/50 transition-all flex flex-col h-full">
+                      <div className="relative pt-[120%] bg-[#111] overflow-hidden">
+                        <img src={story.image_url} alt="story" className="absolute inset-0 w-full h-full object-cover opacity-80 group-hover:opacity-100 group-hover:scale-105 transition-all duration-700 filter contrast-125 saturate-150" />
+                        <div className="absolute top-4 left-4 w-8 h-8 rounded-full bg-black/60 backdrop-blur-md flex items-center justify-center text-white font-bold text-sm border border-white/20">
+                          {index + 1}
+                        </div>
+                      </div>
+                      <div className="p-5 flex-1 flex flex-col bg-gradient-to-b from-transparent to-black/60">
+                        <textarea 
+                          defaultValue={story.caption || ''} 
+                          onBlur={(e) => supabase.from('stories').update({ caption: e.target.value }).eq('id', story.id)}
+                          placeholder="Bu rasm haqida hikoyangizni yozing..."
+                          className="w-full h-24 text-sm font-serif italic text-white/90 bg-white/5 border border-white/10 p-3 rounded-xl focus:border-[#d4af37] focus:outline-none transition-colors placeholder:text-white/30 resize-none flex-1"
+                        />
+                      </div>
+                      <button onClick={() => handleDeleteStory(story.id)} className="absolute top-4 right-4 p-3 bg-red-500/80 backdrop-blur-md rounded-full text-white opacity-0 group-hover:opacity-100 transition-all hover:bg-red-600 shadow-xl translate-y-2 group-hover:translate-y-0">
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+                  ))}
+                  
+                  {stories.length === 0 && (
+                    <div className="col-span-full py-20 text-center text-gray-500 border-2 border-dashed border-[#d4af37]/30 rounded-[32px] bg-white/5">
+                      <div className="w-24 h-24 rounded-full bg-[#d4af37]/10 mx-auto flex items-center justify-center mb-6">
+                        <Heart size={40} className="text-[#d4af37] opacity-80" />
+                      </div>
+                      <p className="text-xl font-serif text-white mb-2">Hikoya kadrlarini qo'shing</p>
+                      <p className="text-gray-400 font-light max-w-md mx-auto">Eng shirin xotiralarni ketma-ket yuklang va tagiga yozuvlar qoldiring. Bu u uchun haqiqiy kinoga aylanadi!</p>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
 

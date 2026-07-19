@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { Heart, Lock, Unlock, Play, Pause, Loader2, Settings } from 'lucide-react';
 import { supabase } from '../supabase';
 import { Link } from 'react-router-dom';
+import CinematicStory from './CinematicStory';
 
 export default function LivingAlbum({ userId }) {
   const [isPlaying, setIsPlaying] = useState(false);
@@ -15,6 +16,8 @@ export default function LivingAlbum({ userId }) {
   const [profile, setProfile] = useState(null);
   const [memories, setMemories] = useState([]);
   const [coupons, setCoupons] = useState([]);
+  const [stories, setStories] = useState([]);
+  const [showCinematic, setShowCinematic] = useState(false);
 
   const themeTokens = {
     dark: {
@@ -46,13 +49,19 @@ export default function LivingAlbum({ userId }) {
       if (!userId) return;
       setLoading(true);
 
-      const [profRes, memRes, coupRes] = await Promise.all([
+      const [profRes, memRes, coupRes, storyRes] = await Promise.all([
         supabase.from('profiles').select('*').eq('id', userId).single(),
         supabase.from('memories').select('*').eq('user_id', userId).order('created_at', { ascending: false }),
-        supabase.from('coupons').select('*').eq('user_id', userId).order('created_at', { ascending: true })
+        supabase.from('coupons').select('*').eq('user_id', userId).order('created_at', { ascending: true }),
+        supabase.from('stories').select('*').eq('user_id', userId).order('order_index', { ascending: true })
       ]);
 
-      if (profRes.data) setProfile(profRes.data);
+      let isPrem = false;
+      if (profRes.data) {
+        setProfile(profRes.data);
+        isPrem = profRes.data.is_premium;
+      }
+      
       if (memRes.data) {
         // assign random rotation and yOffset to memories for the cascade effect
         const positionedMemories = memRes.data.map(m => ({
@@ -63,6 +72,11 @@ export default function LivingAlbum({ userId }) {
         setMemories(positionedMemories);
       }
       if (coupRes.data) setCoupons(coupRes.data);
+      
+      if (storyRes.data && storyRes.data.length > 0 && isPrem) {
+        setStories(storyRes.data);
+        setShowCinematic(true);
+      }
 
       setLoading(false);
     }
@@ -150,6 +164,10 @@ export default function LivingAlbum({ userId }) {
   return (
     <div className={`min-h-screen ${currentTheme.bg} font-sans ${currentTheme.text} overflow-x-hidden selection:${currentTheme.accentBg} selection:text-[#111] relative transition-colors duration-1000`}>
       
+      {showCinematic && (
+        <CinematicStory stories={stories} onComplete={() => setShowCinematic(false)} />
+      )}
+
       {/* Background ambient glow - optimized for performance */}
       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-lg h-[500px] pointer-events-none" style={{ background: `radial-gradient(circle, ${currentTheme.glow} 0%, transparent 60%)` }} />
 
